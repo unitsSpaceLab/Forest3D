@@ -7,6 +7,45 @@ Forest3D is an advanced terrain generation and environmental modeling toolkit th
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
+## Pipeline
+
+Forest3D follows a 4-step pipeline to generate simulation environments:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   1. TERRAIN    │     │   2. CONVERT    │     │   3. GENERATE   │     │   4. LAUNCH     │
+│                 │     │                 │     │                 │     │                 │
+│  DEM (GeoTIFF)  │────►│ Blender Assets  │────►│  Place Models   │────►│ Open Gazebo     │
+│       ↓         │     │       ↓         │     │       ↓         │     │       ↓         │
+│  models/ground/ │     │ models/{tree,   │     │ worlds/forest_  │     │  Simulation     │
+│                 │     │  rock,bush,...} │     │    world.world  │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+| Step | Command | Input | Output |
+|------|---------|-------|--------|
+| 1 | `forest3d terrain` | DEM file (.tif) | Terrain mesh + SDF model |
+| 2 | `forest3d convert` | Blender files (.blend) | Gazebo models (DAE + SDF) |
+| 3 | `forest3d generate` | models/ directory | World file (.world) |
+| 4 | `forest3d launch` | World file | Gazebo simulation |
+
+**Example workflow:**
+```bash
+# Step 1: Generate terrain from DEM
+forest3d terrain --dem ./dem/terrain.tif
+
+# Step 2: Convert Blender assets to Gazebo models
+forest3d convert -i ./Blender-Assets -o ./models -c tree
+forest3d convert -i ./Blender-Assets -o ./models -c rock
+forest3d convert -i ./Blender-Assets -o ./models -c bush
+
+# Step 3: Generate forest world (places models on terrain)
+forest3d generate --density '{"tree": 50, "rock": 10, "bush": 20}'
+
+# Step 4: Launch Gazebo to view the result
+forest3d launch
+```
+
 ## Features
 
 - **Terrain Generation**: DEM processing with resolution enhancement and Gaussian smoothing
