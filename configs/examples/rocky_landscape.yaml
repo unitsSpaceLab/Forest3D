@@ -1,0 +1,13 @@
+# Rocky Landscape Configuration
+# Use for mountain or rocky terrain simulation
+
+terrain:
+  scale_factor: 1.5   # Larger scale for mountains
+  smooth_sigma: 0.3   # Rougher terrain
+
+density:
+  tree: 20     # Sparse trees
+  bush: 15     # Some shrubs
+  rock: 50     # Many rocks
+  grass: 100   # Ground vegetation
+  sand: 10     # Gravel/sand patches

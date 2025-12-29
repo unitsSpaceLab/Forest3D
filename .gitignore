@@ -1,0 +1,42 @@
+# Python build artifacts
+*.egg-info/
+*.egg
+dist/
+build/
+*.pyc
+__pycache__/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+.env
+*.local.yaml
+forest3d.yaml
+
+# Logs
+*.log
+
+# Generated outputs
+models/
+worlds/

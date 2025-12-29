@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=64.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forest3d"
+version = "0.1.0"
+description = "Terrain generation and environmental modeling toolkit for Gazebo robotics simulation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "AI4Forest", email = "khalid.bourr@gmail.com"}
+]
+keywords = ["gazebo", "robotics", "simulation", "terrain", "forest", "dem", "3d", "ros"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+dependencies = [
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+    "numpy-stl>=2.16.0",
+    "PyYAML>=6.0",
+    "click>=8.0.0",
+    "rich>=12.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.3.0",
+    "pylint>=2.12.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+forest3d = "forest3d.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/khalidbourr/Forest3D"
+Documentation = "https://github.com/khalidbourr/Forest3D#readme"
+Repository = "https://github.com/khalidbourr/Forest3D.git"
+Issues = "https://github.com/khalidbourr/Forest3D/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+forest3d = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.pylint.messages_control]
+disable = ["C0114", "C0115", "C0116"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --cov=forest3d --cov-report=term-missing"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

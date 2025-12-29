@@ -1,0 +1,13 @@
+# Coastal Configuration
+# Use for beach/dune environments
+
+terrain:
+  scale_factor: 0.8
+  smooth_sigma: 2.0  # Smooth dunes
+
+density:
+  tree: 10     # Sparse coastal trees
+  bush: 20     # Coastal shrubs
+  rock: 15     # Rocky outcrops
+  grass: 80    # Dune grass
+  sand: 30     # Sand dunes

@@ -1,304 +1,255 @@
-# Forest Generator for Gazebo Simulation 
+# Forest3D - Terrain and Forest Generation for Gazebo
 
-Forest3D is an advanced terrain generation and environmental modeling toolkit that transforms real-world geographical data into photorealistic Gazebo simulation environments. The system processes Digital Elevation Model (DEM) data through sophisticated interpolation and smoothing algorithms to create detailed 3D terrain meshes, while automatically converting Blender assets into optimized simulation-ready models with proper collision geometry. Through intelligent procedural placement algorithms, Forest3D populates terrains with diverse natural elements including trees, vegetation, rocks, and ground features, considering factors like terrain slope, elevation, and ecological distribution patterns. The toolkit seamlessly integrates with Gazebo through automated SDF generation, enabling researchers and developers to rapidly create realistic outdoor environments for robotics simulation, autonomous vehicle testing, and environmental modeling applications.
+Forest3D is an advanced terrain generation and environmental modeling toolkit that transforms real-world geographical data into photorealistic Gazebo simulation environments. The system processes Digital Elevation Model (DEM) data through sophisticated interpolation and smoothing algorithms to create detailed 3D terrain meshes, while automatically converting Blender assets into optimized simulation-ready models with proper collision geometry.
 
-![Forest3D Environment](https://github.com/khalidbourr/Forest3D/blob/main/Screenshot%20from%202024-11-21%2022-29-42.png)
-
+![Forest3D Environment](https://github.com/khalidbourr/Forest3D/blob/main/blender2Gazebo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-##  Features
+## Features
 
-- **Terrain Generation**
-  - DEM (Digital Elevation Model) processing
-  - Resolution enhancement with cubic spline interpolation
-  - Gaussian smoothing for natural-looking terrain
-  - STL mesh generation with configurable scaling
+- **Terrain Generation**: DEM processing with resolution enhancement and Gaussian smoothing
+- **Asset Processing**: Automatic Blender to Gazebo conversion with optimized collision meshes
+- **Forest Population**: Intelligent procedural placement with natural clustering patterns
+- **Unified CLI**: Simple `forest3d` command with subcommands for each operation
+- **Docker Support**: Pre-built images with GDAL for easy deployment
 
-- **Asset Processing**
-  - Automatic processing of Blender files (.blend)
-  - Optimized mesh export with decimation
-  - Separate collision mesh generation
-  - Texture and material organization
-  - SDF and configuration file generation
+## Quick Start
 
-- **Forest Population**
-  - Procedural placement of natural elements
-  - Configurable density for different asset types
-  - Support for multiple asset categories
+### Option 1: Docker (Recommended)
 
-##  Installation
-
-### Prerequisites
-
-- Python 3.7+
-- Blender 4.2+ (for asset processing)
-- GDAL
-- NumPy
-- SciPy
-- Gazebo Simulator
-
-### Dependencies Installation
-
-# Install system dependencies
+The Docker image includes everything you need: Python, GDAL, Blender 4.2, and Gazebo Harmonic.
 
 ```bash
-sudo apt-get update
-sudo apt-get install python3-pip python3-numpy python3-gdal python3-scipy
+# Build the image (downloads Blender + Gazebo, ~2GB)
+cd Forest3D
+docker build -t forest3d -f docker/Dockerfile .
+
+# Generate a forest world
+docker run -v $(pwd):/workspace forest3d generate
+
+# Convert Blender assets to Gazebo models
+docker run -v $(pwd):/workspace forest3d convert \
+  -i /workspace/Blender-Assets -o /workspace/models -c tree
+
+# Launch Gazebo to view the world (requires X11)
+xhost +local:docker  # Allow Docker to access display
+docker run -e DISPLAY=$DISPLAY \
+           -v /tmp/.X11-unix:/tmp/.X11-unix \
+           -v $(pwd):/workspace \
+           --network host \
+           forest3d launch
 ```
 
-# Install Python packages
+### Option 2: pip install
 
 ```bash
-pip3 install numpy-stl
-```
-##  Project Setup & Usage
-
-### Project Setup
-
-# Clone the repository
-
-```bash
+# Clone and install
 git clone https://github.com/khalidbourr/Forest3D.git
 cd Forest3D
-pip install -r requirements.txt
+pip install -e .
+
+# For terrain generation, also install GDAL:
+# Ubuntu/Debian:
+sudo apt install python3-gdal gdal-bin libgdal-dev
+pip install "pygdal==$(gdal-config --version).*"
 ```
 
+## Usage
 
-# Set up Gazebo model path
+### Generate Forest World
+
 ```bash
-echo "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/models" >> ~/.bashrc
-source ~/.bashrc
+# Use default settings
+forest3d generate
+
+# Custom density
+forest3d generate --density '{"tree": 100, "rock": 20, "bush": 30}'
+
+# Use a preset configuration
+forest3d -c configs/examples/dense_forest.yaml generate
 ```
 
-
-### Usage Guide
-
-#### . For testing the environment already existing
+### Generate Terrain from DEM
 
 ```bash
-cd world
+forest3d terrain --dem models/ground/dem/terrain.tif
+
+# With options
+forest3d terrain --dem terrain.tif --scale 2.0 --smooth 1.5 --enhance
+```
+
+### Convert Blender Assets
+
+```bash
+forest3d convert --input ./Blender-Assets --output ./models --category tree
+```
+
+### Launch Gazebo
+
+```bash
+# Using the CLI (auto-configures model path)
+forest3d launch
+
+# Or manually with Gazebo Harmonic
+export GZ_SIM_RESOURCE_PATH=$(pwd)/models
+gz sim worlds/forest_world.world
+
+# Or with Gazebo Classic
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/models
-gazebo forest_world.world
+gazebo worlds/forest_world.world
 ```
 
+## CLI Reference
 
-#### 1. Terrain Generation
+```
+forest3d --help                    # Show all commands
+forest3d terrain --help            # Terrain generation help
+forest3d convert --help            # Asset conversion help
+forest3d generate --help           # Forest generation help
+forest3d launch --help             # Launch Gazebo help
+
+# Global options
+forest3d -v ...                    # Verbose output
+forest3d -vv ...                   # Debug output
+forest3d -c config.yaml ...        # Use config file
+```
+
+## Configuration
+
+Create `forest3d.yaml` in your project directory:
+
+```yaml
+terrain:
+  scale_factor: 1.0
+  smooth_sigma: 1.0
+  enhance: false
+
+density:
+  tree: 50
+  bush: 10
+  rock: 5
+  grass: 50
+  sand: 5
+
+blender:
+  visual_decimation: 0.1
+  collision_decimation: 0.01
+```
+
+See `configs/examples/` for preset configurations.
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `FOREST3D_BLENDER_PATH` | Path to Blender executable |
+| `FOREST3D_BASE_PATH` | Project base directory |
+| `FOREST3D_MODELS_PATH` | Models output directory |
+
+## Project Structure
+
+```
+Forest3D/
+├── src/forest3d/          # Python package
+│   ├── cli/               # Command-line interface
+│   ├── core/              # Core modules (terrain, converter, forest)
+│   ├── config/            # Configuration handling
+│   └── utils/             # Logging and progress utilities
+├── models/                # Gazebo models
+│   ├── ground/            # Terrain model
+│   ├── tree/, rock/, etc. # Asset models
+├── worlds/                # Generated world files
+├── configs/               # Configuration presets
+├── docker/                # Docker files
+└── Blender-Assets/        # Source .blend files
+```
+
+## Asset Categories
+
+| Category | Description | Default Count |
+|----------|-------------|---------------|
+| tree | Large vegetation | 50 |
+| bush | Small vegetation/shrubs | 10 |
+| rock | Rock formations | 5 |
+| grass | Ground cover | 50 |
+| sand | Sand dunes/patches | 5 |
+
+## Adding Custom Assets
+
+1. Place `.blend` files in `Blender-Assets/`
+2. Convert to Gazebo format:
+   ```bash
+   forest3d convert -i ./Blender-Assets -o ./models -c tree
+   ```
+3. Models will be available for forest generation
+
+## Development
 
 ```bash
-python3 TerrainGenerator.py --tif-file terrain.tif
+# Install with dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Format code
+black src/
+
+# Lint
+pylint src/forest3d/
 ```
 
-**Options:**
-- `--tif-file`: Name of the DEM file (must be in `models/ground/dem` directory)
-
-
-#### 2. Asset Generation
-
-The B2GEngine supports the following categories:
-- `tree`: Large vegetation models
-- `bush`: Small vegetation and shrubs
-- `grass`: Ground cover vegetation
-- `rock`: Rock formations
-- `sand`: Ground textures
-
-### Adding New Assets
-
-1. Place your .blend files in the `Blender-Assets` directory
-2. Add the filename to the appropriate category in `B2GEngine.py`:
-
-```python
-model_categories = {
-    'tree': [
-        "MT_PM_V60_Alnus_cremastogyne_01_01.blend",
-        "MT_PM_V60_Acer_buergerianum_01_01.blend"
-    ],
-    'bush': [
-        "MT_PM_V60_Cistus_albidus_01_01.blend",
-        "MT_PM_V60_Agave_sisalana_01_01.blend"
-    ],
-    'grass': [
-        "MT_PM_V60_Cynodon_dactylon_01_01.blend"
-    ],
-    'rock': [
-        "coast-land-rocks-04_2K_9d63d4e8-5064-4b62-8bfa-f7d45027fcf6.blend"
-    ],
-    'sand': [
-        "sand-dune_2K_0a625146-f652-4724-ad1f-ff705a37da8f.blend"
-    ]      
-}
-```
+## Docker Compose
 
 ```bash
-python3 B2GEngine.py --blender-path /path/to/blender \
-                        --blend-files-path /path/to/blend/files \
-                        --models-base-dir /path/to/output
+# Development environment (with Blender + GDAL + Gazebo)
+docker compose -f docker/docker-compose.yml run forest3d-dev
+
+# Convert Blender assets
+docker compose -f docker/docker-compose.yml run convert \
+  -i /workspace/Blender-Assets -o /workspace/models -c tree
+
+# Generate terrain from DEM
+docker compose -f docker/docker-compose.yml run terrain --dem terrain.tif
+
+# Generate forest world
+docker compose -f docker/docker-compose.yml run generate
+
+# Launch Gazebo to view world (requires X11)
+xhost +local:docker
+docker compose -f docker/docker-compose.yml run launch
 ```
 
-**Options:**
-- `--blender-path`: Path to Blender installation
-- `--blend-files-path`: Directory containing Blender files
-- `--models-base-dir`: Output directory for processed models
+## Troubleshooting
 
-#### 3. Forest Generation
-
+### GDAL Not Found
+Use Docker or install GDAL system packages:
 ```bash
-python3 main.py --density '{"tree":25,"rock":5,"bush":10,"grass":500}'
+# Ubuntu/Debian
+sudo apt install python3-gdal gdal-bin libgdal-dev
+pip install "pygdal==$(gdal-config --version).*"
 ```
 
-#### 4. Gazebo Forest World Launch
-
+### Blender Not Found
+Set the path explicitly:
 ```bash
-cd world
+export FOREST3D_BLENDER_PATH=/path/to/blender
+# or
+forest3d convert --blender /path/to/blender ...
+```
+
+### Model Path Issues
+Ensure Gazebo can find models:
+```bash
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/models
-gazebo forest_world.world
 ```
 
-**Options:**
-- `--base-path`: Project base path
-- `--density`: JSON string with model densities
-- `--config-file`: Path to JSON configuration file
-
-##  Project Structure
-```bash
-
-forest-generator/
-├── scripts/
-│   ├── B2GEngine.py
-│   ├── TerrainGenerator.py
-│   └── ForestGenerator.py
-├── models/
-│   ├── ground/
-│   │   ├── dem/
-│   │   ├── mesh/
-│   │   ├── material/
-│   │   └── texture/
-│   ├── tree/
-│   ├── rock/
-│   ├── bush/
-│   └── grass/
-└── worlds/
-    └── forest.world
-
-```
-
-## ⚙️ Configuration
-
-### Asset Categories
-The system supports the following asset categories:
-- `tree`: Large vegetation
-- `rock`: Rock formations
-- `bush`: Small vegetation
-- `grass`: Ground cover
-- `sand`: Ground textures
-
-### Density Configuration
-Create a JSON file with the following structure:
-
-{
-  "tree": 25,
-  "rock": 5,
-  "bush": 10,
-  "grass": 500
-}
-
-##  Advanced Configuration
-
-### Terrain Generation Parameters
-- `scale_factor`: Resolution enhancement factor (default: 6.0)
-- `scale_xy`: Horizontal scaling of terrain (default: 0.25)
-- `scale_z`: Vertical scaling of terrain (default: 5.0)
-- `z_offset`: Height offset (default: 0)
-
-### Asset Processing Parameters
-- Visual mesh decimation ratio: 0.1 (90% reduction)
-- Collision mesh decimation ratio: 0.01 (99% reduction)
-- Supported texture formats: JPG, PNG, JPEG
-
-
-##  License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Contributing
 
-## 💡 Usage Examples
-
-### Basic Terrain Generation
-
-1. Place your DEM file in models/ground/dem
-2. Run terrain generation
-3. Check output in models/ground/mesh
-
-### Custom Forest Configuration
-
-1. Create custom density file
-2. Modify asset parameters
-3. Run forest generation
-4. Verify in Gazebo
-
-##  Troubleshooting
-
-### Common Issues
-
-1. **Gazebo Model Path**
-   - Verify environment variables
-   - Check directory permissions
-
-2. **Blender Export**
-   - Confirm Blender version
-   - Check Python dependencies
-
-3. **Terrain Generation**
-   - Validate DEM format
-   - Check GDAL installation
-
-## ROS Melodic Python Dependencies
-
-### Overview
-When using ROS Melodic (Python 2.7), you'll need a separate Python 3.8 environment for Forest3D dependencies while maintaining ROS functionality.
-
-### Setup Python 3.8 Environment
-
-1. Install Python 3.8
-```bash
-# Install required tools
-apt update
-apt install software-properties-common
-
-# Add Python repository
-add-apt-repository ppa:deadsnakes/ppa
-apt update
-
-# Install Python 3.8
-apt install python3.8 python3.8-venv python3.8-dev
-# Create Python 3.8 environment
-python3.8 -m venv ~/forest3d_env
-
-# Activate environment
-source ~/forest3d_env/bin/activate
-
-# Update pip
-pip install --upgrade pip
-# Install GDAL system packages
-apt update
-apt install python3-gdal gdal-bin libgdal-dev
-
-# Set GDAL environment variables
-export CPLUS_INCLUDE_PATH=/usr/include/gdal
-export C_INCLUDE_PATH=/usr/include/gdal
-
-# Install matching GDAL Python bindings
-pip install "pygdal==`gdal-config --version`.*"
-
-# Modify requirements.txt:
-numpy>=1.21.0
-scipy>=1.7.0
-numpy-stl>=2.16.0
-pathlib>=1.0.1
-black>=22.3.0
-pylint>=2.12.0
-pytest>=7.0.0
-pytest-cov>=3.0.0
-
-# Install requirements:
-pip install -r requirements.txt
+Contributions are welcome! Please feel free to submit a Pull Request.

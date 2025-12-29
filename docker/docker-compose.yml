@@ -1,0 +1,96 @@
+services:
+  # Full Forest3D with all features (GDAL + Blender + Gazebo)
+  forest3d:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: forest3d:latest
+    volumes:
+      - ../models:/workspace/models
+      - ../worlds:/workspace/worlds
+      - ../Blender-Assets:/workspace/Blender-Assets:ro
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+      - FOREST3D_BLENDER_PATH=/opt/blender/blender
+      - GZ_SIM_RESOURCE_PATH=/workspace/models
+    working_dir: /workspace
+
+  # Development environment
+  forest3d-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    image: forest3d:dev
+    volumes:
+      - ..:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+      - FOREST3D_BLENDER_PATH=/opt/blender/blender
+      - GZ_SIM_RESOURCE_PATH=/workspace/models
+      - DISPLAY=${DISPLAY}
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    network_mode: host
+
+  # Terrain generation service
+  terrain:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: forest3d:latest
+    volumes:
+      - ../models/ground:/workspace/models/ground
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+    working_dir: /workspace
+    entrypoint: ["forest3d", "terrain"]
+
+  # Asset conversion service (with Blender)
+  convert:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: forest3d:latest
+    volumes:
+      - ../Blender-Assets:/workspace/Blender-Assets:ro
+      - ../models:/workspace/models
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+      - FOREST3D_BLENDER_PATH=/opt/blender/blender
+    working_dir: /workspace
+    entrypoint: ["forest3d", "convert"]
+
+  # Forest generation service
+  generate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: forest3d:latest
+    volumes:
+      - ../models:/workspace/models:ro
+      - ../worlds:/workspace/worlds
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+    working_dir: /workspace
+    entrypoint: ["forest3d", "generate"]
+
+  # Launch Gazebo with GUI (requires X11)
+  launch:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: forest3d:latest
+    volumes:
+      - ../models:/workspace/models:ro
+      - ../worlds:/workspace/worlds:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - FOREST3D_BASE_PATH=/workspace
+      - GZ_SIM_RESOURCE_PATH=/workspace/models
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    working_dir: /workspace
+    network_mode: host
+    entrypoint: ["forest3d", "launch"]

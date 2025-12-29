@@ -1,0 +1,33 @@
+# Forest3D Default Configuration
+# Copy to ./forest3d.yaml or ~/.config/forest3d/config.yaml
+
+# Blender configuration for asset conversion
+blender:
+  # Path to Blender executable (auto-detected if not set)
+  # Override with FOREST3D_BLENDER_PATH environment variable
+  # path: /usr/bin/blender
+
+  # Mesh decimation ratios (lower = simpler mesh)
+  visual_decimation: 0.1      # 10% of original (for rendering)
+  collision_decimation: 0.01  # 1% of original (for physics)
+
+# Terrain generation settings
+terrain:
+  scale_factor: 1.0     # Scale multiplier for terrain
+  smooth_sigma: 1.0     # Gaussian smoothing (0 = no smoothing)
+  enhance: false        # Enable DEM resolution enhancement
+  enhance_scale: 6.0    # Enhancement scale factor
+
+# Default model density for forest generation
+density:
+  tree: 50
+  bush: 10
+  rock: 5
+  grass: 50
+  sand: 5
+
+# Project paths (auto-detected from current directory if not set)
+# paths:
+#   base_path: /path/to/project
+#   models_path: /path/to/models
+#   worlds_path: /path/to/worlds
