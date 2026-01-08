@@ -145,36 +145,19 @@ class AssetExporter:
         for d in [mesh_dir, textures_dir, materials_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
-        # Export DAE files
+        # Export glTF files (better PBR material support than COLLADA)
         if progress_callback:
-            progress_callback(20, "Exporting DAE files...")
-        logger.info("Exporting DAE files...")
+            progress_callback(20, "Exporting glTF files...")
+        logger.info("Exporting glTF files...")
 
-        dae_path = mesh_dir / f"{base_name}.dae"
-        collision_path = mesh_dir / f"{base_name}_collision.dae"
-        self._export_dae(blend_file, dae_path, collision_path)
+        glb_path = mesh_dir / f"{base_name}.glb"
+        collision_path = mesh_dir / f"{base_name}_collision.glb"
+        self._export_glb(blend_file, glb_path, collision_path)
 
-        # Move textures to correct location
+        # glTF binary (.glb) embeds textures automatically
         if progress_callback:
-            progress_callback(40, "Organizing textures...")
-        logger.info("Organizing textures...")
-
-        for file in mesh_dir.iterdir():
-            if file.suffix.lower() in [".jpg", ".png", ".jpeg"]:
-                dst_path = textures_dir / file.name
-                shutil.move(str(file), str(dst_path))
-                logger.debug(f"Moved texture: {file.name}")
-
-        # Get textures and create material
-        if progress_callback:
-            progress_callback(60, "Creating material...")
-        textures = self._find_textures(textures_dir)
-
-        if textures:
-            logger.info("Creating material file...")
-            self._create_material_file(base_name, textures, materials_dir)
-        else:
-            logger.warning("No textures found for material creation")
+            progress_callback(40, "Textures embedded in glTF...")
+        logger.info("Textures embedded in glTF binary format")
 
         # Generate SDF and config files
         if progress_callback:
@@ -194,50 +177,68 @@ class AssetExporter:
 
         return asset_dir
 
-    def _export_dae(self, blend_file: Path, output_path: Path, collision_path: Path) -> None:
-        """Export optimized DAE for visual and collision meshes."""
+    def _export_glb(self, blend_file: Path, output_path: Path, collision_path: Path) -> None:
+        """Export optimized glTF binary (.glb) for visual and collision meshes.
+
+        glTF format properly handles PBR materials and embeds textures automatically.
+        This is the recommended format for Gazebo Sim.
+        """
         blender_script = f'''
 import bpy
 
-# Load file
-bpy.ops.wm.open_mainfile(filepath="{blend_file}")
+def prepare_and_export(filepath, decimate_ratio, include_textures=True):
+    """Prepare mesh objects and export to glTF binary."""
+    # Deselect all first
+    bpy.ops.object.select_all(action='DESELECT')
 
-# Export visual mesh
-for obj in bpy.data.objects:
-    if obj.type == 'MESH':
+    mesh_objects = []
+    for obj in bpy.data.objects:
+        if obj.type == 'MESH':
+            # Make sure object is visible and in view layer
+            obj.hide_set(False)
+            obj.hide_viewport = False
+            obj.hide_render = False
+
+            # Link to scene if not already linked
+            if obj.name not in bpy.context.view_layer.objects:
+                try:
+                    bpy.context.collection.objects.link(obj)
+                except:
+                    pass
+
+            mesh_objects.append(obj)
+
+    # Select and process mesh objects
+    for obj in mesh_objects:
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
+
+        # Apply decimate modifier
         decimate = obj.modifiers.new(name="Decimate", type='DECIMATE')
-        decimate.ratio = {self.visual_decimation}
+        decimate.ratio = decimate_ratio
         bpy.ops.object.modifier_apply(modifier="Decimate")
 
-bpy.ops.wm.collada_export(
-    filepath="{output_path}",
-    selected=True,
-    apply_modifiers=True,
-    include_children=True,
-    include_armatures=True,
-    include_shapekeys=False
-)
+    # Export to glTF binary format
+    # glTF handles PBR materials natively and embeds textures in .glb
+    bpy.ops.export_scene.gltf(
+        filepath=filepath,
+        export_format='GLB',
+        use_selection=False,
+        export_apply=True,
+        export_texcoords=include_textures,  # Skip for collision
+        export_normals=True,
+        export_materials='EXPORT' if include_textures else 'NONE',  # Skip for collision
+        export_image_format='AUTO',
+        export_yup=False,
+    )
 
-# Reset and export collision mesh
+# Load file and export visual mesh with textures
 bpy.ops.wm.open_mainfile(filepath="{blend_file}")
-for obj in bpy.data.objects:
-    if obj.type == 'MESH':
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-        decimate = obj.modifiers.new(name="Decimate", type='DECIMATE')
-        decimate.ratio = {self.collision_decimation}
-        bpy.ops.object.modifier_apply(modifier="Decimate")
+prepare_and_export("{output_path}", {self.visual_decimation}, include_textures=True)
 
-bpy.ops.wm.collada_export(
-    filepath="{collision_path}",
-    selected=True,
-    apply_modifiers=True,
-    include_children=True,
-    include_armatures=True,
-    include_shapekeys=False
-)
+# Reload and export collision mesh (no textures needed)
+bpy.ops.wm.open_mainfile(filepath="{blend_file}")
+prepare_and_export("{collision_path}", {self.collision_decimation}, include_textures=False)
 '''
 
         # Use a temporary file for the script
@@ -256,10 +257,10 @@ bpy.ops.wm.collada_export(
             if output_path.exists() and collision_path.exists():
                 logger.debug(f"Successfully exported: {output_path} and {collision_path}")
             else:
-                logger.error(f"Failed to export DAE files")
+                logger.error(f"Failed to export glTF files")
                 logger.debug(f"Blender stdout: {result.stdout}")
                 logger.debug(f"Blender stderr: {result.stderr}")
-                raise RuntimeError("Blender export failed - output files not created")
+                raise RuntimeError("Blender glTF export failed - output files not created")
 
         except subprocess.TimeoutExpired:
             raise RuntimeError("Blender export timed out after 5 minutes")
@@ -279,31 +280,29 @@ bpy.ops.wm.collada_export(
         return textures
 
     def _create_sdf_file(self, model_name: str, model_dir: Path, category: str) -> Path:
-        """Create SDF file for the model."""
+        """Create SDF file for the model.
+
+        Uses glTF binary format (.glb) which properly handles PBR materials
+        and embeds textures. This is the recommended format for Gazebo Sim.
+        """
         sdf_content = f'''<?xml version="1.0" ?>
-<sdf version="1.6">
+<sdf version="1.8">
     <model name="{model_name}">
         <static>true</static>
         <link name="link">
             <collision name="collision">
                 <geometry>
                     <mesh>
-                        <uri>model://{category}/{model_name}/mesh/{model_name}_collision.dae</uri>
+                        <uri>mesh/{model_name}_collision.glb</uri>
                     </mesh>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
                     <mesh>
-                        <uri>model://{category}/{model_name}/mesh/{model_name}.dae</uri>
+                        <uri>mesh/{model_name}.glb</uri>
                     </mesh>
                 </geometry>
-                <material>
-                    <script>
-                        <uri>model://{category}/{model_name}/materials/{model_name}.material</uri>
-                        <name>{model_name}</name>
-                    </script>
-                </material>
             </visual>
         </link>
     </model>
@@ -365,7 +364,7 @@ bpy.ops.wm.collada_export(
 <model>
     <name>{model_name}</name>
     <version>1.0</version>
-    <sdf version="1.6">model.sdf</sdf>
+    <sdf version="1.8">model.sdf</sdf>
 
     <author>
         <name>AI4Forest</name>
@@ -383,26 +382,27 @@ bpy.ops.wm.collada_export(
         return config_path
 
     def _create_test_world(self, model_name: str, model_dir: Path, category: str) -> Path:
-        """Create test world file."""
-        world_content = f'''<?xml version="1.0" ?>
-<sdf version="1.6">
-    <world name="default">
-        <include>
-            <uri>model://sun</uri>
-        </include>
-        <include>
-            <uri>model://ground_plane</uri>
-        </include>
-        <include>
-            <name>{model_name}</name>
-            <pose>0 0 0 0 0 0</pose>
-            <uri>model://{category}/{model_name}</uri>
-        </include>
-    </world>
-</sdf>'''
+        """Create test world file for Gazebo Sim.
+
+        Uses inline definitions for sun and ground plane instead of model includes
+        for compatibility with Gazebo Sim (gz sim).
+        """
+        from xml.etree import ElementTree as ET
+        from forest3d.utils.sdf import create_world_base, add_ground_plane, write_world_file
+
+        sdf_root, world = create_world_base("asset_test")
+
+        # Add ground plane for testing individual assets
+        add_ground_plane(world)
+
+        # Add the model being tested
+        include = ET.SubElement(world, "include")
+        ET.SubElement(include, "name").text = model_name
+        ET.SubElement(include, "pose").text = "0 0 0 0 0 0"
+        ET.SubElement(include, "uri").text = f"model://{category}/{model_name}"
 
         world_path = model_dir / "test.world"
-        world_path.write_text(world_content)
+        write_world_file(sdf_root, world_path)
         logger.debug(f"Created test world file: {world_path}")
         return world_path
 

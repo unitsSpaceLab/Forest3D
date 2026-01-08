@@ -282,31 +282,20 @@ class TerrainGenerator:
         return config_path
 
     def _create_test_world(self) -> Path:
-        world_content = '''<?xml version="1.0" ?>
-<sdf version="1.7">
-    <world name="default">
-        <gravity>0 0 -9.8</gravity>
-        <light type="directional" name="sun">
-            <cast_shadows>true</cast_shadows>
-            <pose>0 0 10 0 0 0</pose>
-            <diffuse>0.8 0.8 0.8 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-            <direction>-0.5 0.1 -0.9</direction>
-        </light>
-        <include>
-            <name>terrain</name>
-            <uri>model://ground</uri>
-            <pose>0 0 0 0 0 0</pose>
-        </include>
-        <physics type="ode">
-            <real_time_update_rate>1000.0</real_time_update_rate>
-            <max_step_size>0.001</max_step_size>
-            <real_time_factor>1</real_time_factor>
-        </physics>
-    </world>
-</sdf>'''
+        """Create test world file for Gazebo Sim."""
+        from xml.etree import ElementTree as ET
+        from forest3d.utils.sdf import create_world_base, write_world_file
+
+        sdf_root, world = create_world_base("terrain_test")
+
+        # Add terrain model
+        terrain = ET.SubElement(world, "include")
+        ET.SubElement(terrain, "name").text = "terrain"
+        ET.SubElement(terrain, "uri").text = "model://ground"
+        ET.SubElement(terrain, "pose").text = "0 0 0 0 0 0"
+
         world_path = self.terrain_path / "test.world"
-        world_path.write_text(world_content)
+        write_world_file(sdf_root, world_path)
         return world_path
 
     def process_terrain(

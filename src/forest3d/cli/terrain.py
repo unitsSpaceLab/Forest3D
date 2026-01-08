@@ -6,15 +6,18 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from forest3d.config.loader import load_config
 
+# Default output location
+DEFAULT_OUTPUT = "./models/ground"
+
 
 @click.command()
 @click.option(
     "--dem", "-d", "dem_path", type=click.Path(exists=True), required=True,
-    help="Path to DEM file (GeoTIFF)"
+    help="Path to DEM file (GeoTIFF), typically in ./DEM/ folder"
 )
 @click.option(
-    "--output", "-o", "output_path", type=click.Path(),
-    help="Output directory for generated terrain"
+    "--output", "-o", "output_path", type=click.Path(), default=DEFAULT_OUTPUT,
+    help=f"Output directory for generated terrain (default: {DEFAULT_OUTPUT})"
 )
 @click.option(
     "--scale", "-s", type=float, default=None,
@@ -30,7 +33,7 @@ from forest3d.config.loader import load_config
 )
 @click.option(
     "--texture", "-t", "texture_path", type=click.Path(exists=True),
-    help="Path to Blender file (.blend) for terrain texture extraction"
+    help="Path to Blender file (.blend) for terrain texture, typically in ./Blender-Assets/soil/"
 )
 @click.option(
     "--blender", "blender_path", type=click.Path(exists=True),
@@ -43,16 +46,33 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, bl
     Processes a Digital Elevation Model (GeoTIFF) file and creates:
 
     \b
-    - STL mesh file for Gazebo
-    - SDF model definition
+    - STL mesh file for Gazebo Sim
+    - SDF model definition with PBR materials
     - model.config file
     - Test world file
 
     \b
+    Recommended folder structure:
+        Forest3D/
+        ├── DEM/                      <- DEM files (geographic data)
+        │   └── terrain.tif
+        ├── Blender-Assets/
+        │   ├── tree/, rock/, ...     <- 3D model assets
+        │   └── soil/                 <- Terrain textures
+        │       └── soil.blend
+        └── models/                   <- Output
+            └── ground/               <- Terrain output
+
+    \b
     Examples:
-        forest3d terrain --dem ./dem/terrain.tif
-        forest3d terrain -d terrain.tif --scale 2.0 --smooth 1.5
-        forest3d terrain -d terrain.tif --enhance -o ./output
+        # Basic terrain from DEM
+        forest3d terrain --dem ./DEM/terrain.tif
+
+        # With soil texture
+        forest3d terrain --dem ./DEM/terrain.tif --texture ./Blender-Assets/soil/soil.blend
+
+        # Custom options
+        forest3d terrain -d ./DEM/terrain.tif -t ./Blender-Assets/soil/soil.blend --scale 2.0 --smooth 1.5
 
     \b
     Note: This command requires GDAL to be installed. Use Docker for
@@ -73,6 +93,14 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, bl
         config.terrain.texture_blend = Path(texture_path)
     if blender_path is not None:
         config.blender.path = Path(blender_path)
+
+    # Show configuration
+    console.print(f"[bold]Terrain Generation[/bold]")
+    console.print(f"  DEM: [cyan]{dem_path}[/cyan]")
+    console.print(f"  Output: [cyan]{output_path}[/cyan]")
+    if texture_path:
+        console.print(f"  Texture: [cyan]{texture_path}[/cyan]")
+    console.print()
 
     with Progress(
         SpinnerColumn(),
@@ -118,6 +146,6 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, bl
             raise click.ClickException(str(e))
 
     console.print(f"\n[green]Success![/green] Terrain created at: {result_path}")
-    console.print(f"\n[dim]To view in Gazebo:[/dim]")
-    console.print(f"  export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:{result_path.parent}")
-    console.print(f"  gazebo {result_path}/test.world")
+    console.print(f"\n[dim]To view in Gazebo Sim:[/dim]")
+    console.print(f"  export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:{result_path.parent}")
+    console.print(f"  gz sim {result_path}/test.world")

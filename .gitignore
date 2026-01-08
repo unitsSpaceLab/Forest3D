@@ -40,3 +40,5 @@ forest3d.yaml
 # Generated outputs
 models/
 worlds/
+Blender-Assets/*.blend
+Blender-Assets/**/*.blend

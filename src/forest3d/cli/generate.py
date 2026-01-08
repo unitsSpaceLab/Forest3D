@@ -23,8 +23,12 @@ from forest3d.core.forest import WorldPopulator
     "--output", "-o", type=click.Path(),
     help="Output world file path"
 )
+@click.option(
+    "--verbose", "-v", is_flag=True,
+    help="Show detailed statistics including scale info"
+)
 @click.pass_context
-def generate(ctx, base_path, density, output):
+def generate(ctx, base_path, density, output, verbose):
     """Generate a forest world from existing models.
 
     Procedurally places models on terrain using intelligent positioning
@@ -36,6 +40,7 @@ def generate(ctx, base_path, density, output):
         forest3d generate
         forest3d generate --density '{"tree": 100, "rock": 20}'
         forest3d generate -b ./my-project -o ./worlds/custom.world
+        forest3d generate -v  # Show detailed stats
 
     \b
     Default density:
@@ -47,6 +52,8 @@ def generate(ctx, base_path, density, output):
         - Rocks prefer terrain edges
         - Bushes often appear near trees
         - Sand dunes are placed at edges
+        - Cross-category collision avoidance
+        - Scale-aware spacing
     """
     console = ctx.obj["console"]
     logger = ctx.obj["logger"]
@@ -101,10 +108,10 @@ def generate(ctx, base_path, density, output):
             )
 
     with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
     ) as progress:
         progress_state["progress"] = progress
         progress_state["task"] = progress.add_task("Generating forest...", total=100)
@@ -131,19 +138,54 @@ def generate(ctx, base_path, density, output):
     console.print(f"[green]Success![/green] World created at: {world_path}")
     console.print(f"\nTotal models placed: [bold]{stats['total_models']}[/bold]")
 
-    # Show placed counts
+    # Show placed counts with success rate
     results_table = Table(show_header=True)
     results_table.add_column("Category", style="cyan")
     results_table.add_column("Requested", justify="right")
     results_table.add_column("Placed", justify="right")
+    results_table.add_column("Success", justify="right")
 
+    total_requested = 0
+    total_placed = 0
     for cat in ["tree", "bush", "rock", "grass", "sand"]:
         requested = density_config.get(cat, 0)
         placed = stats["by_category"].get(cat, 0)
-        results_table.add_row(cat, str(requested), str(placed))
+        total_requested += requested
+        total_placed += placed
+
+        if requested > 0:
+            success_rate = f"{(placed / requested * 100):.0f}%"
+            color = "green" if placed == requested else "yellow" if placed > 0 else "red"
+            results_table.add_row(cat, str(requested), str(placed), f"[{color}]{success_rate}[/{color}]")
+        else:
+            results_table.add_row(cat, str(requested), str(placed), "-")
 
     console.print(results_table)
 
+    # Show warning if many placements failed
+    failed = total_requested - total_placed
+    if failed > 0:
+        console.print(f"\n[yellow]Note:[/yellow] {failed} models couldn't be placed (area too crowded)")
+
+    # Show scale statistics if verbose
+    if verbose and stats.get("scale_stats"):
+        console.print()
+        scale_table = Table(title="Scale Statistics", show_header=True)
+        scale_table.add_column("Category", style="cyan")
+        scale_table.add_column("Min", justify="right")
+        scale_table.add_column("Max", justify="right")
+        scale_table.add_column("Mean", justify="right")
+
+        for cat, scale_info in stats["scale_stats"].items():
+            scale_table.add_row(
+                cat,
+                f"{scale_info['min']:.2f}",
+                f"{scale_info['max']:.2f}",
+                f"{scale_info['mean']:.2f}",
+            )
+
+        console.print(scale_table)
+
     console.print(f"\n[dim]To launch in Gazebo:[/dim]")
-    console.print(f"  export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:{project_base}/models")
-    console.print(f"  gazebo {world_path}")
+    console.print(f"  export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:{project_base}/models")
+    console.print(f"  gz sim {world_path}")
