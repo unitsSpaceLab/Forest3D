@@ -33,6 +33,19 @@ class TerrainConfig(BaseModel):
     smooth_sigma: float = Field(default=1.0, ge=0.0, le=10.0, description="Gaussian smoothing")
     enhance: bool = Field(default=False, description="Enable DEM enhancement")
     enhance_scale: float = Field(default=6.0, ge=1.0, le=20.0, description="Enhancement scale")
+    texture_blend: Optional[Path] = Field(
+        default=None, description="Path to Blender file for terrain texture extraction"
+    )
+    material_name: str = Field(
+        default="Terrain/Ground", description="Name for the generated material"
+    )
+
+    @field_validator("texture_blend", mode="before")
+    @classmethod
+    def expand_texture_path(cls, v):
+        if v is None:
+            return v
+        return Path(v).expanduser().resolve()
 
 
 class DensityConfig(BaseModel):

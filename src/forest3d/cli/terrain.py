@@ -28,8 +28,16 @@ from forest3d.config.loader import load_config
     "--enhance/--no-enhance", default=None,
     help="Enable DEM resolution enhancement"
 )
+@click.option(
+    "--texture", "-t", "texture_path", type=click.Path(exists=True),
+    help="Path to Blender file (.blend) for terrain texture extraction"
+)
+@click.option(
+    "--blender", "blender_path", type=click.Path(exists=True),
+    help="Path to Blender executable (auto-detected if not specified)"
+)
 @click.pass_context
-def terrain(ctx, dem_path, output_path, scale, smooth, enhance):
+def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, blender_path):
     """Generate terrain mesh from DEM data.
 
     Processes a Digital Elevation Model (GeoTIFF) file and creates:
@@ -61,6 +69,10 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance):
         config.terrain.smooth_sigma = smooth
     if enhance is not None:
         config.terrain.enhance = enhance
+    if texture_path is not None:
+        config.terrain.texture_blend = Path(texture_path)
+    if blender_path is not None:
+        config.blender.path = Path(blender_path)
 
     with Progress(
         SpinnerColumn(),
@@ -86,10 +98,16 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance):
                 tif_path=Path(dem_path),
                 output_path=Path(output_path) if output_path else None,
                 config=config.terrain,
+                blender_path=config.blender.path,
             )
 
             progress.update(task, description="Processing DEM data...")
             result_path = generator.process_terrain()
+
+            # Extract textures from Blender file if provided
+            if config.terrain.texture_blend:
+                progress.update(task, description="Extracting textures from Blender file...")
+                generator.extract_terrain_texture(config.terrain.texture_blend)
 
             progress.update(task, description="Complete!")
 
