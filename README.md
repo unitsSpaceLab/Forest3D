@@ -25,19 +25,17 @@ Forest3D follows a 4-step pipeline to generate simulation environments:
 | Step | Command | Input | Output |
 |------|---------|-------|--------|
 | 1 | `forest3d terrain` | DEM file (.tif) | Terrain mesh + SDF model |
-| 2 | `forest3d convert` | Blender files (.blend) | Gazebo models (DAE + SDF) |
+| 2 | `forest3d convert` | Blender files (.blend) | Gazebo models (glTF + SDF) |
 | 3 | `forest3d generate` | models/ directory | World file (.world) |
 | 4 | `forest3d launch` | World file | Gazebo simulation |
 
 **Example workflow:**
 ```bash
 # Step 1: Generate terrain from DEM
-forest3d terrain --dem ./dem/terrain.tif
+forest3d terrain --dem ./DEM/terrain.tif
 
-# Step 2: Convert Blender assets to Gazebo models
-forest3d convert -i ./Blender-Assets -o ./models -c tree
-forest3d convert -i ./Blender-Assets -o ./models -c rock
-forest3d convert -i ./Blender-Assets -o ./models -c bush
+# Step 2: Convert Blender assets (auto-detects categories from subfolders)
+forest3d convert -i ./Blender-Assets -o ./models
 
 # Step 3: Generate forest world (places models on terrain)
 forest3d generate --density '{"tree": 50, "rock": 10, "bush": 20}'
@@ -113,16 +111,23 @@ forest3d -c configs/examples/dense_forest.yaml generate
 ### Generate Terrain from DEM
 
 ```bash
-forest3d terrain --dem models/ground/dem/terrain.tif
+forest3d terrain --dem ./DEM/terrain.tif
+
+# With texture from Blender
+forest3d terrain --dem ./DEM/terrain.tif --texture ./Blender-Assets/soil/soil.blend
 
 # With options
-forest3d terrain --dem terrain.tif --scale 2.0 --smooth 1.5 --enhance
+forest3d terrain --dem ./DEM/terrain.tif --scale 2.0 --smooth 1.5 --enhance
 ```
 
 ### Convert Blender Assets
 
 ```bash
-forest3d convert --input ./Blender-Assets --output ./models --category tree
+# Auto-detect categories from subfolders (tree/, rock/, bush/, etc.)
+forest3d convert -i ./Blender-Assets -o ./models
+
+# Or specify category manually
+forest3d convert -i ./Blender-Assets/tree -o ./models -c tree
 ```
 
 ### Launch Gazebo
@@ -131,13 +136,9 @@ forest3d convert --input ./Blender-Assets --output ./models --category tree
 # Using the CLI (auto-configures model path)
 forest3d launch
 
-# Or manually with Gazebo Harmonic
-export GZ_SIM_RESOURCE_PATH=$(pwd)/models
+# Or manually with Gazebo Sim (Harmonic)
+export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/models
 gz sim worlds/forest_world.world
-
-# Or with Gazebo Classic
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/models
-gazebo worlds/forest_world.world
 ```
 
 ## CLI Reference
@@ -195,14 +196,20 @@ Forest3D/
 │   ├── cli/               # Command-line interface
 │   ├── core/              # Core modules (terrain, converter, forest)
 │   ├── config/            # Configuration handling
-│   └── utils/             # Logging and progress utilities
-├── models/                # Gazebo models
+│   └── utils/             # Shared utilities
+├── DEM/                   # DEM files (GeoTIFF)
+├── Blender-Assets/        # Source .blend files
+│   ├── tree/              # Tree models
+│   ├── rock/              # Rock models
+│   ├── bush/              # Bush models
+│   ├── grass/             # Grass models
+│   └── soil/              # Terrain textures
+├── models/                # Generated Gazebo models
 │   ├── ground/            # Terrain model
-│   ├── tree/, rock/, etc. # Asset models
+│   └── tree/, rock/, etc. # Asset models
 ├── worlds/                # Generated world files
 ├── configs/               # Configuration presets
-├── docker/                # Docker files
-└── Blender-Assets/        # Source .blend files
+└── docker/                # Docker files
 ```
 
 ## Asset Categories
@@ -217,10 +224,16 @@ Forest3D/
 
 ## Adding Custom Assets
 
-1. Place `.blend` files in `Blender-Assets/`
+1. Place `.blend` files in category subfolders:
+   ```
+   Blender-Assets/
+   ├── tree/your_tree.blend
+   ├── rock/your_rock.blend
+   └── bush/your_bush.blend
+   ```
 2. Convert to Gazebo format:
    ```bash
-   forest3d convert -i ./Blender-Assets -o ./models -c tree
+   forest3d convert -i ./Blender-Assets -o ./models
    ```
 3. Models will be available for forest generation
 
@@ -280,9 +293,9 @@ forest3d convert --blender /path/to/blender ...
 ```
 
 ### Model Path Issues
-Ensure Gazebo can find models:
+Ensure Gazebo Sim can find models:
 ```bash
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/models
+export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/models
 ```
 
 ## License
