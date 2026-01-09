@@ -39,6 +39,11 @@ DEFAULT_OUTPUT = "./models/ground"
     "--blender", "blender_path", type=click.Path(exists=True),
     help="Path to Blender executable (auto-detected if not specified)"
 )
+
+# Advanced options (uncomment to enable):
+# @click.option("--z-scale", type=float, default=None, help="Z scale factor for elevation")
+# @click.option("--uv-tile", "-u", type=float, default=10.0, help="UV tile scale - texture repetition")
+
 @click.pass_context
 def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, blender_path):
     """Generate terrain mesh from DEM data.
@@ -51,6 +56,10 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, bl
     - model.config file
     - Test world file
 
+    \b
+        Advanced options (edit CLI to enable):
+        --z-scale    Separate Z elevation scaling
+        --uv-tile    Texture tiling repetition (default: 10.0)
     \b
     Recommended folder structure:
         Forest3D/
