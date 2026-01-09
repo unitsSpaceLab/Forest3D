@@ -2,7 +2,11 @@
 
 Forest3D eliminates the manual overhead of building realistic simulation environments. Using DEM terrain data and Blender assets, it automatically generates collision-accurate Gazebo worlds with procedurally placed vegetation, rocks, and trees—ensuring both visual realism and physical fidelity for simulation.
 
-![Forest3D Environment](https://github.com/khalidbourr/Forest3D/blob/main/blender2Gazebo.png)
+| Forest Environment – Soil 1 | Forest Environment – Soil 2 | Forest Environment – Soil 3 |
+|-----------------|-------------|-------------------|
+| ![](https://raw.githubusercontent.com/unitsSpaceLab/Forest3D/feature/terrain-texture/Screenshot%20from%202026-01-08%2023-56-51.png) | ![](https://raw.githubusercontent.com/unitsSpaceLab/Forest3D/feature/terrain-texture/Screenshot%20from%202026-01-09%2000-01-54.png) | ![](https://raw.githubusercontent.com/unitsSpaceLab/Forest3D/feature/terrain-texture/Screenshot%20from%202026-01-09%2000-04-26.png) |
+
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
