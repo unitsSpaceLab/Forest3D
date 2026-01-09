@@ -32,7 +32,7 @@ class WorldPopulator:
 
     # Minimum distances between models of same category
     MIN_DISTANCES = {
-        "tree": 3.0,
+        "tree": 8.0,
         "bush": 2.0,
         "rock": 4.0,
         "grass": 0.5,
@@ -42,7 +42,7 @@ class WorldPopulator:
     # Cross-category minimum distances
     # Keys are tuples of (category1, category2), order doesn't matter
     CROSS_CATEGORY_DISTANCES = {
-        ("tree", "tree"): 3.0,
+        ("tree", "tree"): 8.0,
         ("tree", "bush"): 1.5,
         ("tree", "rock"): 2.0,
         ("tree", "grass"): 0.5,

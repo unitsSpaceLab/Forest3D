@@ -1,47 +1,34 @@
-"""Shared SDF world generation utilities for Gazebo Sim."""
+"""Shared SDF utilities for Gazebo Sim world generation."""
 
 from typing import Tuple
 from xml.etree import ElementTree as ET
 
 
 def create_world_base(world_name: str) -> Tuple[ET.Element, ET.Element]:
-    """Create SDF world with Gazebo Sim plugins, physics, gravity, and lighting.
-
-    Args:
-        world_name: Name for the world element.
-
-    Returns:
-        Tuple of (sdf_root, world_element) for adding content.
-    """
-    # Create SDF root (version 1.8 for Gazebo Sim)
+    """Create SDF 1.8 world with plugins, physics, gravity, and sun."""
     sdf_root = ET.Element("sdf", version="1.8")
     world = ET.SubElement(sdf_root, "world", name=world_name)
 
-    # Add Gazebo Sim plugins
     _add_plugins(world)
 
-    # Add physics configuration
     physics = ET.SubElement(world, "physics", {"name": "1ms", "type": "ignored"})
     ET.SubElement(physics, "max_step_size").text = "0.001"
     ET.SubElement(physics, "real_time_factor").text = "1.0"
 
-    # Add gravity at world level (SDF 1.8 style)
     ET.SubElement(world, "gravity").text = "0 0 -9.8"
 
-    # Add lighting
     _add_lighting(world)
 
     return sdf_root, world
 
 
 def _add_plugins(world: ET.Element) -> None:
-    """Add Gazebo Sim system plugins to world."""
+    """Add Gazebo Sim system plugins."""
     plugins = [
         ("gz-sim-physics-system", "gz::sim::systems::Physics"),
         ("gz-sim-user-commands-system", "gz::sim::systems::UserCommands"),
         ("gz-sim-scene-broadcaster-system", "gz::sim::systems::SceneBroadcaster"),
     ]
-
     for filename, name in plugins:
         plugin = ET.SubElement(world, "plugin")
         plugin.set("filename", filename)
@@ -49,8 +36,7 @@ def _add_plugins(world: ET.Element) -> None:
 
 
 def _add_lighting(world: ET.Element) -> None:
-    """Add optimized lighting to the world for Gazebo Sim."""
-    # Sun (directional light with shadows)
+    """Add directional sun light."""
     sun = ET.SubElement(world, "light", {"name": "sun", "type": "directional"})
     ET.SubElement(sun, "cast_shadows").text = "true"
     ET.SubElement(sun, "pose").text = "0 0 10 0 0 0"
@@ -65,19 +51,17 @@ def _add_lighting(world: ET.Element) -> None:
 
 
 def add_ground_plane(world: ET.Element) -> None:
-    """Add a simple ground plane for testing individual models."""
+    """Add simple ground plane for testing."""
     ground = ET.SubElement(world, "model", {"name": "ground_plane"})
     ET.SubElement(ground, "static").text = "true"
     link = ET.SubElement(ground, "link", {"name": "link"})
 
-    # Collision
     collision = ET.SubElement(link, "collision", {"name": "collision"})
     collision_geom = ET.SubElement(collision, "geometry")
     plane = ET.SubElement(collision_geom, "plane")
     ET.SubElement(plane, "normal").text = "0 0 1"
     ET.SubElement(plane, "size").text = "100 100"
 
-    # Visual
     visual = ET.SubElement(link, "visual", {"name": "visual"})
     visual_geom = ET.SubElement(visual, "geometry")
     plane = ET.SubElement(visual_geom, "plane")
@@ -90,13 +74,10 @@ def add_ground_plane(world: ET.Element) -> None:
 
 
 def write_world_file(sdf_root: ET.Element, output_path) -> None:
-    """Write SDF world to file with pretty printing."""
+    """Write SDF world to file."""
     tree = ET.ElementTree(sdf_root)
-
-    # Pretty print XML (Python 3.9+)
     try:
         ET.indent(tree, space="    ")
     except AttributeError:
-        pass  # Python < 3.9
-
+        pass
     tree.write(str(output_path), encoding="utf-8", xml_declaration=True)
