@@ -1,5 +1,10 @@
 # Forest3D - Terrain and Forest Generation for Gazebo
 
+  > **Note**: For the latest version with Gazebo Sim (Harmonic) support, glTF assets, and terrain textures, use the [`feature/terrain-texture`](https://github.com/unitsSpaceLab/Forest3D/tree/feature/terrain-texture) branch:
+  > ```bash
+  > git clone -b feature/terrain-texture https://github.com/unitsSpaceLab/Forest3D.git
+  > 
+
 Forest3D eliminates the manual overhead of building realistic simulation environments. Using DEM terrain data and Blender assets, it automatically generates collision-accurate Gazebo worlds with procedurally placed vegetation, rocks, and trees—ensuring both visual realism and physical fidelity for simulation.
 
 ![Forest3D Environment](https://github.com/khalidbourr/Forest3D/blob/main/blender2Gazebo.png)
