@@ -31,3 +31,7 @@ density:
 #   base_path: /path/to/project
 #   models_path: /path/to/models
 #   worlds_path: /path/to/worlds
+
+# Terramechanics configuration
+terramechanics:
+  soil_type: Sand_marsSim    # Default soil type for terrain

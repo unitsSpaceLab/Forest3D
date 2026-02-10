@@ -1,6 +1,7 @@
 """Launch Gazebo with generated world CLI subcommand."""
 
 import os
+import signal
 import shutil
 import subprocess
 import click
@@ -137,22 +138,49 @@ def launch(ctx, world_path, base_path, verbose):
         if verbose:
             cmd.append("--verbose")
 
+    # Set up terramechanics plugin path if built
+    try:
+        from forest3d.core.soil_bridge import get_plugin_build_dir
+
+        plugin_build = get_plugin_build_dir()
+        if plugin_build.exists():
+            existing_plugin_path = env.get("GZ_SIM_SYSTEM_PLUGIN_PATH", "")
+            if existing_plugin_path:
+                env["GZ_SIM_SYSTEM_PLUGIN_PATH"] = f"{plugin_build}:{existing_plugin_path}"
+            else:
+                env["GZ_SIM_SYSTEM_PLUGIN_PATH"] = str(plugin_build)
+            console.print(f"  Plugin: [cyan]{plugin_build}[/cyan]")
+    except FileNotFoundError:
+        pass  # Plugin not installed, skip
+
     logger.info(f"Running: {' '.join(cmd)}")
 
     try:
         console.print("[dim]Starting Gazebo... (press Ctrl+C to exit)[/dim]")
 
-        # Run Gazebo
-        result = subprocess.run(
+        # Launch in a new process group so we can kill server + GUI together
+        proc = subprocess.Popen(
             cmd,
             env=env,
             cwd=str(project_base),
+            start_new_session=True,
         )
 
-        if result.returncode != 0:
-            logger.warning(f"Gazebo exited with code {result.returncode}")
+        proc.wait()
+
+        if proc.returncode != 0:
+            logger.warning(f"Gazebo exited with code {proc.returncode}")
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]Gazebo closed[/yellow]")
+        console.print("\n[yellow]Shutting down Gazebo...[/yellow]")
+        # Kill the entire process group (server + GUI)
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+            proc.wait(timeout=5)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            os.killpg(proc.pid, signal.SIGKILL)
+        except Exception:
+            pass
+        console.print("[yellow]Gazebo closed[/yellow]")
     except Exception as e:
         raise click.ClickException(f"Failed to launch Gazebo: {e}")

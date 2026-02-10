@@ -39,13 +39,17 @@ DEFAULT_OUTPUT = "./models/ground"
     "--blender", "blender_path", type=click.Path(exists=True),
     help="Path to Blender executable (auto-detected if not specified)"
 )
+@click.option(
+    "--soil", "soil_type", type=str, default=None,
+    help="Soil type for terramechanics (e.g., Sand_marsSim, Lunar_soil, Clay)"
+)
 
 # Advanced options (uncomment to enable):
 # @click.option("--z-scale", type=float, default=None, help="Z scale factor for elevation")
 # @click.option("--uv-tile", "-u", type=float, default=10.0, help="UV tile scale - texture repetition")
 
 @click.pass_context
-def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, blender_path):
+def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, blender_path, soil_type):
     """Generate terrain mesh from DEM data.
 
     Processes a Digital Elevation Model (GeoTIFF) file and creates:
@@ -158,3 +162,14 @@ def terrain(ctx, dem_path, output_path, scale, smooth, enhance, texture_path, bl
     console.print(f"\n[dim]To view in Gazebo Sim:[/dim]")
     console.print(f"  export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:{result_path.parent}")
     console.print(f"  gz sim {result_path}/test.world")
+
+    # Write terrain mapping for terramechanics if soil type specified
+    if soil_type:
+        try:
+            from forest3d.core.soil_bridge import write_terrain_mapping
+
+            mapping_file = write_terrain_mapping(soil_type)
+            console.print(f"\n[green]Terrain mapping:[/green] 'terrain' → {soil_type}")
+            console.print(f"  Written to: {mapping_file}")
+        except ValueError as e:
+            raise click.ClickException(str(e))

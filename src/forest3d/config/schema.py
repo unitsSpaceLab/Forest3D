@@ -75,6 +75,14 @@ class PathsConfig(BaseModel):
         return Path(v).expanduser().resolve()
 
 
+class TerramechanicsConfig(BaseModel):
+    """Terramechanics plugin configuration."""
+
+    soil_type: str = Field(
+        default="Sand_marsSim", description="Default soil type for terrain"
+    )
+
+
 class Forest3DConfig(BaseModel):
     """Main configuration schema for Forest3D."""
 
@@ -82,5 +90,6 @@ class Forest3DConfig(BaseModel):
     terrain: TerrainConfig = Field(default_factory=TerrainConfig)
     density: DensityConfig = Field(default_factory=DensityConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
+    terramechanics: TerramechanicsConfig = Field(default_factory=TerramechanicsConfig)
 
     model_config = {"extra": "ignore"}

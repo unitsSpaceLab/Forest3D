@@ -61,11 +61,15 @@ from forest3d.cli.terrain import terrain
 from forest3d.cli.convert import convert
 from forest3d.cli.generate import generate
 from forest3d.cli.launch import launch
+from forest3d.cli.soil import soil
+from forest3d.cli.build_plugin import build_plugin
 
 main.add_command(terrain)
 main.add_command(convert)
 main.add_command(generate)
 main.add_command(launch)
+main.add_command(soil)
+main.add_command(build_plugin)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,3 @@
+[submodule "plugins/gz_terramechanics"]
+	path = plugins/gz_terramechanics
+	url = https://github.com/unitsSpaceLab/gz_terramechanics.git

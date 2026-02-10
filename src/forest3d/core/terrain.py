@@ -93,6 +93,8 @@ class TerrainGenerator:
 
     def _setup_directories(self) -> None:
         for path in [self.mesh_path, self.material_path, self.texture_path]:
+            if path.exists():
+                shutil.rmtree(path)
             path.mkdir(parents=True, exist_ok=True)
 
     def enhance_dem(self, scale_factor: float = 6.0) -> Path:
@@ -264,13 +266,13 @@ class TerrainGenerator:
                     <specular>0.1 0.1 0.1 1</specular>
                     <pbr>
                         <metal>
-                            <albedo_map>model://ground/texture/{albedo_map}</albedo_map>'''
+                            <albedo_map>texture/{albedo_map}</albedo_map>'''
             if normal_map:
                 pbr += f'''
-                            <normal_map>model://ground/texture/{normal_map}</normal_map>'''
+                            <normal_map>texture/{normal_map}</normal_map>'''
             if roughness_map:
                 pbr += f'''
-                            <roughness_map>model://ground/texture/{roughness_map}</roughness_map>'''
+                            <roughness_map>texture/{roughness_map}</roughness_map>'''
             pbr += '''
                             <metalness>0.0</metalness>
                         </metal>

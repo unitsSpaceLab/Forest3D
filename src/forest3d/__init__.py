@@ -6,5 +6,6 @@ __author__ = "AI4Forest"
 from forest3d.core.terrain import TerrainGenerator
 from forest3d.core.converter import AssetExporter
 from forest3d.core.forest import WorldPopulator
+from forest3d.core import soil_bridge
 
-__all__ = ["TerrainGenerator", "AssetExporter", "WorldPopulator", "__version__"]
+__all__ = ["TerrainGenerator", "AssetExporter", "WorldPopulator", "soil_bridge", "__version__"]
