@@ -33,6 +33,15 @@ Forest3D follows a 4-step pipeline to generate simulation environments:
 | 3 | `forest3d generate` | models/ directory | World file (.world) |
 | 4 | `forest3d launch` | World file | Gazebo simulation |
 
+**Terramechanics (optional):**
+
+| Command | Description |
+|---------|-------------|
+| `forest3d soil --list` | List available soil types |
+| `forest3d soil --set Clay` | Set active soil for terramechanics |
+| `forest3d build-plugin` | Build the gz_terramechanics C++ plugin |
+| `forest3d terrain --dem terrain.tif --soil Sand_marsSim` | Generate terrain with soil config |
+
 **Example workflow:**
 ```bash
 # Step 1: Generate terrain from DEM
@@ -53,6 +62,7 @@ forest3d launch
 - **Terrain Generation**: DEM processing with resolution enhancement and Gaussian smoothing
 - **Asset Processing**: Automatic Blender to Gazebo conversion with optimized collision meshes
 - **Forest Population**: Intelligent procedural placement with natural clustering patterns
+- **Terramechanics Integration**: Soil parameter management and [gz_terramechanics](https://github.com/unitsSpaceLab/gz_terramechanics) plugin support
 - **Unified CLI**: Simple `forest3d` command with subcommands for each operation
 - **Docker Support**: Pre-built images with GDAL for easy deployment
 
@@ -87,7 +97,7 @@ docker run -e DISPLAY=$DISPLAY \
 
 ```bash
 # Clone and install
-git clone https://github.com/khalidbourr/Forest3D.git
+git clone --recurse-submodules https://github.com/unitsSpaceLab/Forest3D.git
 cd Forest3D
 pip install -e .
 
@@ -137,13 +147,31 @@ forest3d convert -i ./Blender-Assets/tree -o ./models -c tree
 ### Launch Gazebo
 
 ```bash
-# Using the CLI (auto-configures model path)
+# Using the CLI (auto-configures model path + plugin path)
 forest3d launch
 
 # Or manually with Gazebo Sim (Harmonic)
 export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/models
 gz sim worlds/forest_world.world
 ```
+
+### Terramechanics
+
+```bash
+# Build the Gazebo terramechanics plugin
+forest3d build-plugin
+
+# List available soil types
+forest3d soil --list
+
+# Set soil type (generates terrain_mapping.yaml)
+forest3d soil --set Clay
+
+# Or set soil during terrain generation
+forest3d terrain --dem ./DEM/terrain.tif --soil Lunar_soil
+```
+
+Available soils: `Sand_marsSim`, `Clay`, `Dry_sand`, `Lunar_soil`, `HIT-LSS1`, `Soil_Direct_90_sand`
 
 ## CLI Reference
 
@@ -153,6 +181,8 @@ forest3d terrain --help            # Terrain generation help
 forest3d convert --help            # Asset conversion help
 forest3d generate --help           # Forest generation help
 forest3d launch --help             # Launch Gazebo help
+forest3d soil --help               # Soil management help
+forest3d build-plugin --help       # Plugin build help
 
 # Global options
 forest3d -v ...                    # Verbose output
@@ -191,6 +221,7 @@ See `configs/examples/` for preset configurations.
 | `FOREST3D_BLENDER_PATH` | Path to Blender executable |
 | `FOREST3D_BASE_PATH` | Project base directory |
 | `FOREST3D_MODELS_PATH` | Models output directory |
+| `FOREST3D_PATH` | Forest3D root (used by ROS2 launch files) |
 
 ## Project Structure
 
@@ -208,6 +239,8 @@ Forest3D/
 │   ├── bush/              # Bush models
 │   ├── grass/             # Grass models
 │   └── soil/              # Terrain textures
+├── plugins/               # Gazebo plugins (git submodules)
+│   └── gz_terramechanics/ # Terramechanics plugin
 ├── models/                # Generated Gazebo models
 │   ├── ground/            # Terrain model
 │   └── tree/, rock/, etc. # Asset models
