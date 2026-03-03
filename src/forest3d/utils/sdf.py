@@ -28,6 +28,7 @@ def _add_plugins(world: ET.Element) -> None:
         ("gz-sim-physics-system", "gz::sim::systems::Physics"),
         ("gz-sim-user-commands-system", "gz::sim::systems::UserCommands"),
         ("gz-sim-scene-broadcaster-system", "gz::sim::systems::SceneBroadcaster"),
+        ("gz-sim-contact-system", "gz::sim::systems::Contact"),
     ]
     for filename, name in plugins:
         plugin = ET.SubElement(world, "plugin")
