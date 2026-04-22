@@ -1,4 +1,9 @@
-# Forest3D - Terrain and Forest Generation for Gazebo
+# Forest3D - Terrain and Forest Generation for Gazebo - IFIT2026
+
+This branch is updated and frozed to the commit and data used for the IFIT2026 paper "Automated Generation of Terramechanics-Aware
+Simulation Environments".
+
+Folder "Results" contains the experiment results presented within the manuscript.
 
 Forest3D eliminates the manual overhead of building realistic simulation environments. Using DEM terrain data and Blender assets, it automatically generates collision-accurate Gazebo worlds with procedurally placed vegetation, rocks, and trees—ensuring both visual realism and physical fidelity for simulation.
 
