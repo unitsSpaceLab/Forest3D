@@ -6,5 +6,4 @@ SOFTWARE VERSIONS use for the manuscript
 
  - Blender 4.2
 
- - GDAL ...
-
+ - GDAL 3.4.1
