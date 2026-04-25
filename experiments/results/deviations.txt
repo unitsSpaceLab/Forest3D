@@ -1,0 +1,17 @@
+DISTANCE and DEVIATION RESULTS
+
+||=============================================================================||
+||                       ||     UPHILL TRAVERSE     ||    DOWNHILL TRAVERSE    ||
+||                       ||  LUNA | FOREST | GAZEBO ||  LUNA | FOREST | GAZEBO ||
+||-----------------------||-------------------------||-------------------------||
+|| Distance [m]          ||  4.98 |  2.66  |  7.48  ||  7.42 |  13.17 |  7.46  ||
+||-----------------------||-------------------------||-------------------------||
+|| Deviation end [%]     || -33.4 | -64.5  |   0.0  ||  -0.4 |   76.6 |   0.0  ||
+||-----------------------||-------------------------||-------------------------||
+|| Deviation min/max [%] || -50.0 | -73.1  |   0.0  ||  10.2 |   99.0 |   0.0  ||
+||=============================================================================||
+Deviation = (run - reference) / reference * 100, with GAZEBO as reference
+
+Deviation end -> value at the end of the run
+Deviation min/max -> farthest value from GAZEBO during the run (min for uphill since below reference, max for uphill since above reference)
+

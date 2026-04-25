@@ -1,7 +1,7 @@
 # Forest3D - Terrain and Forest Generation for Gazebo - IFIT2026
 
-This branch is updated and frozed to the commit and data used for the IFIT2026 paper "Automated Generation of Terramechanics-Aware
-Simulation Environments".
+This branch has the repo version used for the submission of paper "Automated Generation of Terramechanics-Aware
+Simulation Environments" at IFIT2026. Additionally, folder "experiments" contains the data and results used within it.
 
 Folder "Results" contains the experiment results presented within the manuscript.
 

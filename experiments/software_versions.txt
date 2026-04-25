@@ -1,0 +1,10 @@
+SOFTWARE VERSIONS use for the manuscript
+
+ - ROS2 Humble 
+
+ - Gazebo Harmonic
+
+ - Blender 4.2
+
+ - GDAL ...
+
