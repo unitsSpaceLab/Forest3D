@@ -16,6 +16,16 @@ Forest3D eliminates the manual overhead of building realistic simulation environ
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
+## Demo
+
+LiDAR point cloud (RViz) accurately captures the 3D assets, confirming Forest3D outputs are ready for real sensor-based simulation workflows.
+<video src="https://github.com/user-attachments/assets/952f6a1d-dbc8-47dd-bce7-383bfa85e7ca" autoplay loop muted playsinline width="100%"/>
+
+## Tutorial
+
+[![Watch the tutorial](https://img.youtube.com/vi/fLvci8LoMeY/maxresdefault.jpg)](https://youtu.be/fLvci8LoMeY)
+
+
 ## Pipeline
 
 Forest3D follows a 4-step pipeline to generate simulation environments:
@@ -342,8 +352,14 @@ export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/models
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the AGPL-3.0 - see the LICENSE file for details.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Custom Environments & Commercial Use
+
+Forest3D ships natural/forest environments out of the box. Need a different one: vineyard, orchard, agricultural row crops, urban, lunar, or a custom site? Custom environment builds are available.
+
+📧 khalid.bourr@gmail.com
