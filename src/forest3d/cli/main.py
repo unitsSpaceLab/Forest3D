@@ -25,7 +25,7 @@ def main(ctx, verbose, quiet, config_path):
 
     \b
     Examples:
-        forest3d terrain --dem terrain.tif
+        forest3d terrain dem --dem terrain.tif
         forest3d convert --input ./blender-assets --output ./models
         forest3d generate --density '{"tree": 50, "rock": 10}'
 

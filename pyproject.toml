@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forest3d"
-version = "0.1.0"
+version = "0.2.0"
 description = "Terrain generation and environmental modeling toolkit for Gazebo robotics simulation"
 readme = "README.md"
 license = {text = "MIT"}

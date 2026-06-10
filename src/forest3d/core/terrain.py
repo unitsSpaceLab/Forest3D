@@ -1,4 +1,4 @@
-"""Terrain generation from DEM data."""
+"""DEM-based terrain generation."""
 
 import logging
 import os
@@ -6,16 +6,18 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
+import click
 import numpy as np
 from scipy.ndimage import gaussian_filter
-from stl import mesh as stl_mesh
 
 from forest3d.config.schema import TerrainConfig
+from forest3d.core.terrain_base import BaseTerrain, register_terrain
 
 try:
     from osgeo import gdal
+
     GDAL_AVAILABLE = True
 except ImportError:
     GDAL_AVAILABLE = False
@@ -35,7 +37,7 @@ def find_blender() -> Optional[Path]:
         Path("/snap/bin/blender"),
         Path("/opt/blender/blender"),
         Path.home() / "blender" / "blender",
-        ]
+    ]
 
     for base in [Path.home() / "Downloads", Path("/opt"), Path.home()]:
         if base.exists():
@@ -54,23 +56,23 @@ def find_blender() -> Optional[Path]:
     return None
 
 
-class TerrainGenerator:
-    """Generate terrain meshes from DEM data.
+@register_terrain
+class DemTerrain(BaseTerrain):
+    """Generate terrain from a Digital Elevation Model (GeoTIFF)."""
 
-    Outputs:
-        - terrain.obj: Visual mesh with UVs for PBR textures
-        - terrain.stl: Collision mesh + height sampling for forest.py
-    """
+    TERRAIN_TYPE = "dem"
 
     def __init__(
-            self,
-            tif_path: Path,
-            output_path: Optional[Path] = None,
-            config: Optional[TerrainConfig] = None,
-            blender_path: Optional[Path] = None,
+        self,
+        tif_path: Path,
+        output_path: Optional[Path] = None,
+        config: Optional[TerrainConfig] = None,
+        blender_path: Optional[Path] = None,
     ):
         if not GDAL_AVAILABLE:
-            raise ImportError("GDAL is required. Install with: pip install GDAL")
+            raise ImportError(
+                "GDAL is required for DEM terrain. Install with: pip install GDAL"
+            )
 
         self.tif_path = Path(tif_path)
         if not self.tif_path.exists():
@@ -81,19 +83,203 @@ class TerrainGenerator:
         self._material_name = self.config.material_name
 
         if output_path:
-            self.terrain_path = Path(output_path)
+            terrain_path = Path(output_path)
         else:
-            self.terrain_path = self.tif_path.parent.parent
+            terrain_path = self.tif_path.parent.parent
 
-        self.mesh_path = self.terrain_path / "mesh"
-        self.material_path = self.terrain_path / "material"
-        self.texture_path = self.terrain_path / "texture"
+        super().__init__(terrain_path, config)
 
-        self._setup_directories()
+    # --- CLI integration ---
 
-    def _setup_directories(self) -> None:
-        for path in [self.mesh_path, self.material_path, self.texture_path]:
-            path.mkdir(parents=True, exist_ok=True)
+    @classmethod
+    def cli_options(cls) -> list:
+        return [
+            click.Option(
+                ["--dem", "-d"], required=True, type=click.Path(exists=True),
+                help="Path to DEM file (GeoTIFF)",
+            ),
+            click.Option(
+                ["--scale", "-s"], type=float, default=None,
+                help="Scale factor (default: 1.0)",
+            ),
+            click.Option(
+                ["--smooth"], type=float, default=None,
+                help="Gaussian smoothing sigma (default: 1.0)",
+            ),
+            click.Option(
+                ["--enhance/--no-enhance"], default=None,
+                help="Enable DEM resolution enhancement",
+            ),
+            click.Option(
+                ["--texture"], type=click.Path(exists=True),
+                help="Path to Blender file for terrain texture",
+            ),
+            click.Option(
+                ["--blender"], type=click.Path(exists=True),
+                help="Path to Blender executable (auto-detected if not set)",
+            ),
+        ]
+
+    @classmethod
+    def cli_create(cls, output_path: Path, config, **kwargs):
+        blender = kwargs.get("blender")
+        return cls(
+            tif_path=kwargs["dem"],
+            output_path=output_path,
+            config=config,
+            blender_path=Path(blender) if blender else None,
+        )
+
+    @classmethod
+    def cli_apply_overrides(cls, config, kwargs) -> None:
+        tc = config.terrain
+        if kwargs.get("scale") is not None:
+            tc.scale_factor = kwargs["scale"]
+        if kwargs.get("smooth") is not None:
+            tc.dem.smooth_sigma = kwargs["smooth"]
+        if kwargs.get("enhance") is not None:
+            tc.dem.enhance = kwargs["enhance"]
+        if kwargs.get("texture") is not None:
+            tc.dem.texture_blend = Path(kwargs["texture"])
+        if kwargs.get("blender") is not None:
+            config.blender.path = Path(kwargs["blender"])
+
+    @classmethod
+    def cli_post_process(cls, instance, config) -> None:
+        if config.terrain.dem.texture_blend:
+            instance.extract_terrain_texture(config.terrain.dem.texture_blend)
+
+    # --- World-population defaults (forest environment) ---
+
+    @classmethod
+    def default_categories(cls) -> Dict:
+        return {
+            "tree": {
+                "scale_range": (0.8, 1.5),
+                "min_distance": 8.0,
+                "zone_weights": {"edge": 0.2, "center": 0.8},
+                "rotation": {
+                    "roll_range": (-0.05, 0.05),
+                    "pitch_range": (-0.05, 0.05),
+                    "yaw_range": (0, 6.2832),
+                },
+            },
+            "rock": {
+                "scale_range": (0.5, 2.0),
+                "min_distance": 4.0,
+                "zone_weights": {"edge": 0.8, "center": 0.2},
+                "rotation": {
+                    "roll_range": (-0.15, 0.15),
+                    "pitch_range": (-0.15, 0.15),
+                    "yaw_range": (0, 6.2832),
+                },
+            },
+            "bush": {
+                "scale_range": (0.3, 1.0),
+                "min_distance": 2.0,
+                "zone_weights": {"edge": 0.4, "center": 0.6},
+                "rotation": {
+                    "roll_range": (-0.03, 0.03),
+                    "pitch_range": (-0.03, 0.03),
+                    "yaw_range": (0, 6.2832),
+                },
+            },
+            "grass": {
+                "scale_range": (0.2, 0.6),
+                "min_distance": 0.5,
+                "zone_weights": {"edge": 0.5, "center": 0.5},
+                "rotation": {
+                    "roll_range": (0.0, 0.0),
+                    "pitch_range": (0.0, 0.0),
+                    "yaw_range": (0, 6.2832),
+                },
+            },
+            "sand": {
+                "scale_range": (1.0, 2.5),
+                "min_distance": 3.0,
+                "zone_weights": {"edge": 0.7, "center": 0.3},
+                "rotation": {
+                    "roll_range": (0.0, 0.0),
+                    "pitch_range": (0.0, 0.0),
+                    "yaw_range": (0, 6.2832),
+                },
+            },
+        }
+
+    @classmethod
+    def default_strategies(cls) -> Dict:
+        from forest3d.core.placement import (
+            ClusteredPlacement,
+            EdgePlacement,
+        )
+
+        return {
+            "sand": EdgePlacement(
+                edge_weight=0.7,
+                jitter=1.0,
+                height_offset_range=(-0.2, 0.0),
+            ),
+            "rock": EdgePlacement(
+                edge_weight=0.8,
+                jitter=2.0,
+                height_offset_range=(-0.1, 0.1),
+            ),
+            "tree": ClusteredPlacement(
+                anchor_categories=("tree",),
+                cluster_prob=0.7,
+                scale_aware=True,
+                radius_scale_mult=2.0,
+                radius_add=0.0,
+                avoid_categories=("sand",),
+                height_offset_range=(-0.08, 0.08),
+            ),
+            "bush": ClusteredPlacement(
+                anchor_categories=("tree",),
+                cluster_prob=0.6,
+                scale_aware=True,
+                radius_scale_mult=1.0,
+                radius_add=3.0,
+                height_offset_range=(-0.08, 0.08),
+            ),
+            "grass": ClusteredPlacement(
+                anchor_categories=("tree", "bush"),
+                cluster_prob=0.5,
+                scale_aware=False,
+                radius_min_fixed=1.0,
+                radius_max_fixed=5.0,
+                height_offset_range=(-0.05, 0.05),
+            ),
+        }
+
+    @classmethod
+    def default_cross_distances(cls) -> Dict:
+        return {
+            ("tree", "tree"): 8.0,
+            ("tree", "bush"): 1.5,
+            ("tree", "rock"): 2.0,
+            ("tree", "grass"): 0.5,
+            ("tree", "sand"): 4.0,
+            ("bush", "bush"): 2.0,
+            ("bush", "rock"): 1.5,
+            ("bush", "grass"): 0.3,
+            ("bush", "sand"): 2.0,
+            ("rock", "rock"): 4.0,
+            ("rock", "grass"): 0.5,
+            ("rock", "sand"): 2.0,
+            ("grass", "grass"): 0.5,
+            ("grass", "sand"): 0.5,
+            ("sand", "sand"): 3.0,
+        }
+
+    @classmethod
+    def default_category_order(cls) -> List[str]:
+        return ["sand", "rock", "tree", "bush", "grass"]
+
+    @classmethod
+    def default_densities(cls) -> Dict[str, int]:
+        return {"tree": 50, "rock": 5, "bush": 10, "grass": 50, "sand": 5}
+
+    # --- DEM-specific operations ---
 
     def enhance_dem(self, scale_factor: float = 6.0) -> Path:
         output_tiff = self.tif_path.parent / "terrain_enhanced.tif"
@@ -111,18 +297,24 @@ class TerrainGenerator:
         logger.info(f"Enhanced DEM saved to: {output_tiff}")
         return output_tiff
 
-    def create_terrain_mesh(
-            self,
-            scale_factor: Optional[float] = None,
-            z_scale: Optional[float] = None,
-            smooth_sigma: Optional[float] = None,
-            enhance: Optional[bool] = None,
-            uv_tile_scale: float = 10.0,
+    # --- Mesh generation ---
+
+    def generate_terrain_mesh(
+        self,
+        scale_factor: Optional[float] = None,
+        z_scale: Optional[float] = None,
+        smooth_sigma: Optional[float] = None,
+        enhance: Optional[bool] = None,
+        uv_tile_scale: float = 10.0,
     ) -> Tuple[Path, dict]:
-        """Create terrain meshes (OBJ for visual, STL for collision/height sampling)."""
-        scale_factor = scale_factor if scale_factor is not None else self.config.scale_factor
+        """Create terrain meshes from DEM data."""
+        scale_factor = (
+            scale_factor if scale_factor is not None else self.config.scale_factor
+        )
         z_scale = z_scale if z_scale is not None else scale_factor
-        smooth_sigma = smooth_sigma if smooth_sigma is not None else self.config.smooth_sigma
+        smooth_sigma = (
+            smooth_sigma if smooth_sigma is not None else self.config.smooth_sigma
+        )
         enhance = enhance if enhance is not None else self.config.enhance
 
         # Load DEM
@@ -146,45 +338,24 @@ class TerrainGenerator:
         rows, cols = elevation.shape
         logger.info(f"Creating mesh from {rows}x{cols} DEM...")
 
-        # Generate vertices, UVs, faces
-        vertices = []
-        uvs = []
-        for y in range(rows):
-            for x in range(cols):
-                world_x = x * pixel_width * scale_factor
-                world_y = y * pixel_height * scale_factor
-                world_z = elevation[y, x] * z_scale
-                vertices.append([world_x, world_y, world_z])
-                uvs.append([(x / (cols - 1)) * uv_tile_scale, (y / (rows - 1)) * uv_tile_scale])
+        # Build mesh from heightmap
+        pixel_width *= scale_factor
+        pixel_height *= scale_factor
+        vertices, uvs, faces = self._build_mesh_from_heightmap(
+            elevation, pixel_width, pixel_height, z_scale, uv_tile_scale
+        )
 
-        faces = []
-        for y in range(rows - 1):
-            for x in range(cols - 1):
-                v0 = y * cols + x
-                v1 = v0 + 1
-                v2 = (y + 1) * cols + x
-                v3 = v2 + 1
-                faces.extend([[v0, v1, v2], [v1, v3, v2]])
-
-        vertices = np.array(vertices)
-        uvs = np.array(uvs)
-        faces = np.array(faces)
-
-        # Center XY, shift Z to 0
-        center_xy = np.mean(vertices[:, :2], axis=0)
-        vertices[:, 0] -= center_xy[0]
-        vertices[:, 1] -= center_xy[1]
-        vertices[:, 2] -= np.min(vertices[:, 2])
+        self._center_and_shift(vertices)
 
         # Calculate normals
         normals = self._calculate_normals(vertices, faces)
 
-        # Save OBJ (visual with UVs)
+        # Save OBJ (visual)
         obj_path = self.mesh_path / "terrain.obj"
         self._write_obj(obj_path, vertices, uvs, normals, faces)
         logger.info(f"Created OBJ mesh: {obj_path}")
 
-        # Save STL (collision + height sampling)
+        # Save STL (collision)
         stl_path = self.mesh_path / "terrain.stl"
         self._write_stl(stl_path, vertices, faces)
         logger.info(f"Created STL mesh: {stl_path}")
@@ -196,196 +367,16 @@ class TerrainGenerator:
             "num_vertices": len(vertices),
             "num_faces": len(faces),
         }
-        logger.info(f"Terrain: X={stats['x_extent']:.2f}, Y={stats['y_extent']:.2f}, Z={stats['z_extent']:.2f}")
+        logger.info(
+            f"Terrain: X={stats['x_extent']:.2f}, "
+            f"Y={stats['y_extent']:.2f}, Z={stats['z_extent']:.2f}"
+        )
         return stl_path, stats
 
-    def _calculate_normals(self, vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
-        """Calculate vertex normals."""
-        normals = np.zeros_like(vertices)
-        for face in faces:
-            v0, v1, v2 = vertices[face[0]], vertices[face[1]], vertices[face[2]]
-            fn = np.cross(v1 - v0, v2 - v0)
-            length = np.linalg.norm(fn)
-            if length > 0:
-                fn /= length
-            for idx in face:
-                normals[idx] += fn
-        lengths = np.linalg.norm(normals, axis=1, keepdims=True)
-        lengths[lengths == 0] = 1
-        normals /= lengths
-        return normals
-
-    def _write_obj(self, path: Path, vertices: np.ndarray, uvs: np.ndarray, normals: np.ndarray, faces: np.ndarray) -> None:
-        """Write OBJ with UVs and normals."""
-        with open(path, 'w') as f:
-            f.write("# Terrain mesh - Forest3D\n")
-            for v in vertices:
-                f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
-            for uv in uvs:
-                f.write(f"vt {uv[0]:.6f} {uv[1]:.6f}\n")
-            for n in normals:
-                f.write(f"vn {n[0]:.6f} {n[1]:.6f} {n[2]:.6f}\n")
-            for face in faces:
-                f.write(f"f {face[0]+1}/{face[0]+1}/{face[0]+1} {face[1]+1}/{face[1]+1}/{face[1]+1} {face[2]+1}/{face[2]+1}/{face[2]+1}\n")
-
-    def _write_stl(self, path: Path, vertices: np.ndarray, faces: np.ndarray) -> None:
-        """Write STL for collision and height sampling."""
-        terrain = stl_mesh.Mesh(np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype))
-        for i, f in enumerate(faces):
-            for j in range(3):
-                terrain.vectors[i][j] = vertices[f[j]]
-        terrain.save(str(path))
-
-    def _create_sdf_file(self, textures: Optional[List[str]] = None) -> Path:
-        """Create SDF with OBJ visual and STL collision."""
-        albedo_map = normal_map = roughness_map = None
-
-        if textures:
-            for t in textures:
-                tl = t.lower()
-                if t.endswith('.exr'):
-                    continue
-                if any(k in tl for k in ["diff", "albedo", "base", "color"]):
-                    albedo_map = t
-                elif any(k in tl for k in ["normal", "nor", "nrm"]):
-                    normal_map = t
-                elif any(k in tl for k in ["rough"]):
-                    roughness_map = t
-            if not albedo_map:
-                for t in textures:
-                    if not t.endswith('.exr'):
-                        albedo_map = t
-                        break
-
-        if albedo_map:
-            pbr = f'''                <material>
-                    <ambient>1.0 1.0 1.0 1</ambient>
-                    <diffuse>1.0 1.0 1.0 1</diffuse>
-                    <specular>0.1 0.1 0.1 1</specular>
-                    <pbr>
-                        <metal>
-                            <albedo_map>model://ground/texture/{albedo_map}</albedo_map>'''
-            if normal_map:
-                pbr += f'''
-                            <normal_map>model://ground/texture/{normal_map}</normal_map>'''
-            if roughness_map:
-                pbr += f'''
-                            <roughness_map>model://ground/texture/{roughness_map}</roughness_map>'''
-            pbr += '''
-                            <metalness>0.0</metalness>
-                        </metal>
-                    </pbr>
-                </material>'''
-        else:
-            pbr = '''                <material>
-                    <ambient>0.6 0.6 0.6 1</ambient>
-                    <diffuse>0.8 0.8 0.8 1</diffuse>
-                </material>'''
-
-        sdf = f'''<?xml version="1.0" ?>
-<sdf version="1.8">
-    <model name="terrain">
-        <static>true</static>
-        <link name="link">
-            <collision name="collision">
-                <geometry>
-                    <mesh>
-                        <uri>model://ground/mesh/terrain.stl</uri>
-                    </mesh>
-                </geometry>
-            </collision>
-            <visual name="visual">
-                <geometry>
-                    <mesh>
-                        <uri>model://ground/mesh/terrain.obj</uri>
-                    </mesh>
-                </geometry>
-{pbr}
-            </visual>
-        </link>
-    </model>
-</sdf>'''
-        sdf_path = self.terrain_path / "model.sdf"
-        sdf_path.write_text(sdf)
-        return sdf_path
-
-    def _create_config_file(self) -> Path:
-        content = '''<?xml version="1.0"?>
-<model>
-    <name>ground</name>
-    <version>1.0</version>
-    <sdf version="1.8">model.sdf</sdf>
-    <author>
-        <name>AI4Forest</name>
-        <email>khalid.bourr@gmail.com</email>
-    </author>
-    <description>Terrain from DEM with PBR materials</description>
-</model>'''
-        path = self.terrain_path / "model.config"
-        path.write_text(content)
-        return path
-
-    def _create_test_world(self) -> Path:
-        content = '''<?xml version="1.0" ?>
-<sdf version="1.8">
-    <world name="terrain_test">
-        <scene>
-            <ambient>0.6 0.6 0.6 1</ambient>
-            <background>0.7 0.8 0.9 1</background>
-        </scene>
-        <physics name="1ms" type="ignored">
-            <max_step_size>0.001</max_step_size>
-            <real_time_factor>1.0</real_time_factor>
-        </physics>
-        <gravity>0 0 -9.8</gravity>
-        <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
-        <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
-        <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
-        <light name="sun" type="directional">
-            <cast_shadows>true</cast_shadows>
-            <pose>0 0 10 0 0 0</pose>
-            <diffuse>1.0 1.0 1.0 1</diffuse>
-            <specular>0.5 0.5 0.5 1</specular>
-            <direction>-0.5 0.1 -0.9</direction>
-        </light>
-        <include>
-            <name>terrain</name>
-            <uri>model://ground</uri>
-        </include>
-    </world>
-</sdf>'''
-        path = self.terrain_path / "test.world"
-        path.write_text(content)
-        return path
-
-    def _find_textures(self) -> List[str]:
-        textures = []
-        if self.texture_path.exists():
-            for f in self.texture_path.iterdir():
-                if f.suffix.lower() in [".jpg", ".png", ".jpeg"]:
-                    textures.append(f.name)
-        return textures
-
-    def process_terrain(
-            self,
-            scale_factor: Optional[float] = None,
-            z_scale: Optional[float] = None,
-            smooth_sigma: Optional[float] = None,
-            enhance: Optional[bool] = None,
-            uv_tile_scale: float = 10.0,
-    ) -> Path:
-        """Full terrain pipeline."""
-        logger.info("Starting terrain generation...")
-        self.create_terrain_mesh(scale_factor, z_scale, smooth_sigma, enhance, uv_tile_scale)
-        textures = self._find_textures()
-        self._create_sdf_file(textures)
-        self._create_config_file()
-        self._create_test_world()
-        logger.info(f"Terrain complete: {self.terrain_path}")
-        return self.terrain_path
+    # --- Texture extraction ---
 
     def extract_terrain_texture(self, blend_file: Path) -> List[Path]:
-        """Extract textures from Blender file."""
+        """Extract textures from Blender file for PBR materials."""
         blend_file = Path(blend_file)
         if not blend_file.exists():
             raise FileNotFoundError(f"Blend file not found: {blend_file}")
@@ -420,8 +411,12 @@ for img in bpy.data.images:
             script_path = f.name
 
         try:
-            subprocess.run([str(blender_path), "--background", "--python", script_path],
-                           capture_output=True, text=True, timeout=120)
+            subprocess.run(
+                [str(blender_path), "--background", "--python", script_path],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
         finally:
             os.unlink(script_path)
 
@@ -429,3 +424,7 @@ for img in bpy.data.images:
         if textures:
             self._create_sdf_file(textures)
         return [self.texture_path / t for t in textures]
+
+
+# Backward compatibility alias
+TerrainGenerator = DemTerrain

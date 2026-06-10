@@ -6,9 +6,15 @@ from rich.progress import Progress, BarColumn, TaskProgressColumn, TextColumn
 
 from forest3d.config.loader import load_config
 from forest3d.core.converter import AssetExporter
+from forest3d.core.terrain_base import list_terrain_types, get_terrain_class
 
-# Known asset categories
-KNOWN_CATEGORIES = ["tree", "bush", "rock", "grass", "sand"]
+
+def known_categories() -> list:
+    """Union of all categories across registered terrain types."""
+    seen: set = set()
+    for t in list_terrain_types():
+        seen.update(get_terrain_class(t).default_categories().keys())
+    return sorted(seen)
 
 
 @click.command()
@@ -25,7 +31,7 @@ KNOWN_CATEGORIES = ["tree", "bush", "rock", "grass", "sand"]
     help="Path to Blender executable (auto-detected if not specified)"
 )
 @click.option(
-    "--category", "-c", type=click.Choice(KNOWN_CATEGORIES),
+    "--category", "-c", type=click.Choice(known_categories()),
     default=None, help="Model category (auto-detected from folder name if not specified)"
 )
 @click.pass_context
@@ -41,19 +47,16 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
     - SDF and config files
 
     \b
+    Known categories: {cats}
+
+    \b
     Examples:
-        # Auto-detect categories from subfolders (tree/, rock/, bush/, etc.)
         forest3d convert -i ./Blender-Assets -o ./models
-
-        # Convert specific category
         forest3d convert -i ./Blender-Assets/tree -o ./models -c tree
-
-        # Custom Blender path
-        forest3d convert -i ./assets -o ./models --blender /opt/blender/blender
 
     \b
     Note: Requires Blender 4.2+ to be installed.
-    """
+    """.format(cats=", ".join(known_categories()))
     console = ctx.obj["console"]
     logger = ctx.obj["logger"]
     config = load_config(ctx.obj.get("config_path"))
@@ -63,15 +66,14 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
 
     input_path = Path(input_dir)
 
-    # Check for category subfolders (tree/, rock/, bush/, etc.)
+    # Check for category subfolders
     category_folders = []
     for folder in input_path.iterdir():
-        if folder.is_dir() and folder.name.lower() in KNOWN_CATEGORIES:
+        if folder.is_dir() and folder.name.lower() in known_categories():
             blend_files = list(folder.glob("*.blend"))
             if blend_files:
                 category_folders.append((folder, folder.name.lower(), blend_files))
 
-    # If category subfolders found, process each
     if category_folders:
         console.print(f"[bold]Auto-detected category folders:[/bold]")
         for folder, cat, files in category_folders:
@@ -104,17 +106,20 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
 
             for folder, cat, blend_files in category_folders:
                 for blend_file in blend_files:
-                    progress.update(task, description=f"[{cat}] {blend_file.name}")
+                    progress.update(
+                        task, description=f"[{cat}] {blend_file.name}"
+                    )
                     try:
                         exporter.process_asset(blend_file, cat)
                         successful += 1
                     except Exception as e:
-                        logger.warning(f"Failed to process {blend_file.name}: {e}")
+                        logger.warning(
+                            f"Failed to process {blend_file.name}: {e}"
+                        )
                         failed += 1
                     progress.advance(task)
 
     else:
-        # No category subfolders - look for .blend files directly
         blend_files = list(input_path.glob("*.blend"))
 
         if not blend_files:
@@ -122,13 +127,14 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
                 f"No .blend files found in {input_dir}\n"
                 f"Expected either:\n"
                 f"  • .blend files directly in the folder\n"
-                f"  • Subfolders named: {', '.join(KNOWN_CATEGORIES)}"
+                f"  • Subfolders named: {', '.join(known_categories())}"
             )
 
-        # Use provided category or default to "tree"
         cat = category or "tree"
 
-        console.print(f"Found [bold]{len(blend_files)}[/bold] Blender files to process")
+        console.print(
+            f"Found [bold]{len(blend_files)}[/bold] Blender files to process"
+        )
         console.print(f"Category: [cyan]{cat}[/cyan]")
         console.print(f"Output: [cyan]{output_dir}[/cyan]")
         console.print()
@@ -153,24 +159,39 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
             TaskProgressColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("Converting assets...", total=len(blend_files))
+            task = progress.add_task(
+                "Converting assets...", total=len(blend_files)
+            )
 
             for blend_file in blend_files:
-                progress.update(task, description=f"Processing {blend_file.name}...")
+                progress.update(
+                    task, description=f"Processing {blend_file.name}..."
+                )
                 try:
                     exporter.process_asset(blend_file, cat)
                     successful += 1
                 except Exception as e:
-                    logger.warning(f"Failed to process {blend_file.name}: {e}")
+                    logger.warning(
+                        f"Failed to process {blend_file.name}: {e}"
+                    )
                     failed += 1
                 progress.advance(task)
 
     console.print()
     if successful > 0:
-        console.print(f"[green]Success![/green] Converted {successful} models to: {output_dir}")
+        console.print(
+            f"[green]Success![/green] Converted {successful} models "
+            f"to: {output_dir}"
+        )
     if failed > 0:
-        console.print(f"[yellow]Warning:[/yellow] {failed} files failed to convert")
+        console.print(
+            f"[yellow]Warning:[/yellow] {failed} files failed to convert"
+        )
 
     if successful > 0:
         console.print(f"\n[dim]To use in Gazebo:[/dim]")
-        console.print(f"  export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:{Path(output_dir).resolve()}")
+        console.print(
+            f"  export "
+            f"GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:"
+            f"{Path(output_dir).resolve()}"
+        )

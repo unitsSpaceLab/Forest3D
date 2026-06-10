@@ -42,3 +42,11 @@ models/
 worlds/
 Blender-Assets/*.blend
 Blender-Assets/**/*.blend
+
+# Development / design artifacts
+*.zip
+*.jar
+*.svg
+*.puml
+gen_uml_svg.py
+tuto/
