@@ -1,9 +1,11 @@
 """Configuration management CLI."""
 
+import re
 from pathlib import Path
 
 import click
 import yaml
+from pydantic import BaseModel
 
 from forest3d.config.loader import (
     config_to_yaml,
@@ -12,6 +14,34 @@ from forest3d.config.loader import (
 )
 from forest3d.config.schema import DensityConfig, Forest3DConfig
 from forest3d.core.terrain_base import get_terrain_class, list_terrain_types
+
+
+def _field_descriptions(model_cls, acc=None):
+    """Flat {field_name: description} map, recursing into nested models."""
+    acc = {} if acc is None else acc
+    for name, field in model_cls.model_fields.items():
+        annotation = field.annotation
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            _field_descriptions(annotation, acc)
+        if field.description and name not in acc:
+            acc[name] = field.description
+    return acc
+
+
+_LEAF_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):\s*(\S.*)$")
+
+
+def _annotate(yaml_text, descriptions):
+    """Append each field's schema description as an inline ``# comment``."""
+    out = []
+    for line in yaml_text.splitlines():
+        match = _LEAF_LINE.match(line)
+        if match and match.group(3) not in ("{}", "[]"):
+            desc = descriptions.get(match.group(2))
+            if desc:
+                line = f"{line}  # {desc}"
+        out.append(line)
+    return "\n".join(out) + "\n"
 
 
 def _tailored_template(terrain_type: str) -> str:
@@ -46,9 +76,10 @@ def _tailored_template(terrain_type: str) -> str:
             return str(obj)
         return obj
 
-    return yaml.dump(
+    text = yaml.dump(
         convert_paths(data), default_flow_style=False, sort_keys=False
     )
+    return _annotate(text, _field_descriptions(Forest3DConfig))
 
 
 @click.group()
