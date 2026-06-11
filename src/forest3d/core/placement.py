@@ -209,6 +209,8 @@ class EdgePlacement(PlacementStrategy):
         terrain_meta: Optional[Dict] = None,
         start_index: int = 0,
     ) -> Tuple[int, int]:
+        if not ctx.model_variants.get(category):
+            return 0, ctx.models_placed
         cfg = ctx.cat_config.get(category, {})
         sr = cfg.get("scale_range", (0.5, 1.0))
         min_x, max_x, min_y, max_y = ctx.get_bounds(margin=self.margin)
@@ -233,7 +235,7 @@ class EdgePlacement(PlacementStrategy):
                 z = ctx.sample_height(x, y)
                 z += ctx.rng.uniform(*self.height_offset_range)
 
-                variant = ctx.random_variant(category) or category
+                variant = ctx.random_variant(category)
                 scale = ctx.rng.uniform(*sr)
                 roll, pitch, yaw = ctx.rotation(category)
 
@@ -336,6 +338,8 @@ class ClusteredPlacement(PlacementStrategy):
         terrain_meta: Optional[Dict] = None,
         start_index: int = 0,
     ) -> Tuple[int, int]:
+        if not ctx.model_variants.get(category):
+            return 0, ctx.models_placed
         cfg = ctx.cat_config.get(category, {})
         sr = cfg.get("scale_range", (0.5, 1.0))
         min_x, max_x, min_y, max_y = ctx.get_bounds(margin=self.margin)
@@ -360,7 +364,7 @@ class ClusteredPlacement(PlacementStrategy):
                 z = ctx.sample_height(x, y)
                 z += ctx.rng.uniform(*self.height_offset_range)
 
-                variant = ctx.random_variant(category) or category
+                variant = ctx.random_variant(category)
                 scale = ctx.rng.uniform(*sr)
                 roll, pitch, yaw = ctx.rotation(category)
 
@@ -441,6 +445,8 @@ class RowPlacement(PlacementStrategy):
         terrain_meta: Optional[Dict] = None,
         start_index: int = 0,
     ) -> Tuple[int, int]:
+        if not ctx.model_variants.get(category):
+            return 0, ctx.models_placed
         min_x, max_x, min_y, max_y = ctx.get_bounds(margin=0)
 
         num_rows = 8
@@ -492,7 +498,7 @@ class RowPlacement(PlacementStrategy):
                 z = ctx.sample_height(x, y)
                 z += ctx.rng.uniform(-0.02, 0.02)
 
-                variant = ctx.random_variant(category) or category
+                variant = ctx.random_variant(category)
                 roll, pitch, yaw = ctx.rotation(category)
 
                 ctx.write_include(

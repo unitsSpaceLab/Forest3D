@@ -49,6 +49,8 @@ def load_config(config_path: Optional[Path] = None) -> Forest3DConfig:
     # Load from file if specified or found
     if config_path is None:
         config_path = find_config_file()
+    elif not isinstance(config_path, Path):
+        config_path = Path(config_path)
 
     if config_path and config_path.exists():
         with open(config_path) as f:

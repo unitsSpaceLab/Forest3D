@@ -181,12 +181,15 @@ class WorldPopulator:
         self,
         density_config: Optional[Dict[str, int]] = None,
         terrain_meta: Optional[Dict] = None,
+        output_path: Optional[Path] = None,
     ) -> Path:
         """Create a world file with placed models.
 
         Args:
             density_config: Dict of category -> count.  Uses defaults if None.
             terrain_meta: Optional metadata (e.g. row geometry for crops).
+            output_path: Where to write the world file.  Defaults to
+                ``worlds/forest_world.world`` under the project base.
 
         Returns:
             Path to the generated world file.
@@ -272,7 +275,11 @@ class WorldPopulator:
                 f"(failed: {failed_here})"
             )
 
-        output_path = self.worlds_path / "forest_world.world"
+        if output_path is None:
+            output_path = self.worlds_path / "forest_world.world"
+        else:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
         write_world_file(world_elem, output_path)
 
         logger.info(f"World file created at: {output_path}")
