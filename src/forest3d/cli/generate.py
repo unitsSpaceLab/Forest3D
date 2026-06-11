@@ -22,7 +22,7 @@ from forest3d.core.terrain_base import get_terrain_class, list_terrain_types
     "--terrain-type", "-t", type=click.Choice(list_terrain_types()),
     default=None,
     help="Terrain environment (determines available categories). "
-         "Defaults to forest (backward compat)."
+         "Defaults to the config file's terrain.type (or 'dem')."
 )
 @click.option(
     "--density", "-d", type=str,
@@ -64,6 +64,12 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
     logger = ctx.obj["logger"]
     config = load_config(ctx.obj.get("config_path"))
 
+    # Terrain type: the --terrain-type flag wins; otherwise fall back to the
+    # config file (terrain.type, which defaults to "dem"). This lets a config
+    # fully select the environment without repeating the flag.
+    if not terrain_type:
+        terrain_type = config.terrain.type
+
     # Parse density JSON if provided
     parsed_density: Optional[Dict[str, int]] = None
     if density:
@@ -96,24 +102,24 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             )
         meta = {**meta, **overrides} if meta else overrides
 
-    # Build density config: start from terrain-type defaults, then merge
-    # --density overrides (instead of mutating config.density, so we stay
-    # decoupled from the schema)
-    if terrain_type:
-        cls = get_terrain_class(terrain_type)
-        density_config = dict(cls.default_densities())
-    else:
-        density_config = config.density.as_dict()
+    # Build density config: start from the terrain type's class defaults,
+    # overlay densities the user explicitly set in the config file (but only
+    # for categories this terrain type uses, so schema defaults like crop: 0
+    # don't clobber class defaults), then apply --density overrides.
+    cls = get_terrain_class(terrain_type)
+    density_config = dict(cls.default_densities())
+    for key in config.density.model_fields_set:
+        if key in density_config:
+            density_config[key] = getattr(config.density, key)
 
     if parsed_density:
         density_config.update(parsed_density)
-        # Warn about unknown categories (with backward-compat schema check)
-        if not terrain_type:
-            for key in parsed_density:
-                if not hasattr(config.density, key):
-                    console.print(
-                        f"[yellow]Warning:[/yellow] Unknown category '{key}'"
-                    )
+        for key in parsed_density:
+            if key not in cls.default_densities():
+                console.print(
+                    f"[yellow]Warning:[/yellow] '{key}' is not a category for "
+                    f"terrain type '{terrain_type}'"
+                )
     project_base = Path(base_path) if base_path else Path.cwd()
     if not (project_base / "models").exists():
         raise click.ClickException(
