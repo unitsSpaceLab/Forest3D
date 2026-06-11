@@ -69,12 +69,9 @@ def config():
 )
 @click.pass_context
 def init(ctx, terrain_type, output_path, force):
-    """Write a forest3d.yaml template for a terrain type.
+    """Write a forest3d.yaml template (TERRAIN_TYPE: dem or crop_rows).
 
-    TERRAIN_TYPE selects which environment the template targets (defaults to
-    'dem'). The template only includes the options relevant to that type, so
-    'config init crop_rows' yields a crop-focused file and 'config init dem' a
-    forest one. The template is schema-derived, so it never drifts from code.
+    Example: forest3d config init crop_rows
     """
     console = ctx.obj["console"]
     types = list_terrain_types()
