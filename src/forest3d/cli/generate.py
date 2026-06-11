@@ -73,14 +73,28 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             raise click.ClickException(f"Invalid JSON for density: {e}")
 
     # Parse terrain metadata JSON if provided
+    # Seed placement geometry from the crop-rows config so the terrain mesh
+    # and crop placement share one source of truth. --terrain-meta then
+    # overrides individual keys for one-off runs.
     meta = None
+    if terrain_type == "crop_rows":
+        cr = config.terrain.crop_rows
+        meta = {
+            "num_rows": cr.num_rows,
+            "row_width": cr.row_width,
+            "furrow_width": cr.furrow_width,
+            "headland_width": cr.headland_width,
+            "plant_spacing": cr.plant_spacing,
+            "stagger": cr.stagger,
+        }
     if terrain_meta:
         try:
-            meta = json.loads(terrain_meta)
+            overrides = json.loads(terrain_meta)
         except json.JSONDecodeError as e:
             raise click.ClickException(
                 f"Invalid JSON for terrain-meta: {e}"
             )
+        meta = {**meta, **overrides} if meta else overrides
 
     # Build density config: start from terrain-type defaults, then merge
     # --density overrides (instead of mutating config.density, so we stay
@@ -156,6 +170,7 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             world_path = populator.create_forest_world(
                 density_config=density_config,
                 terrain_meta=meta,
+                output_path=Path(output) if output else None,
             )
 
             stats = populator.get_model_statistics()

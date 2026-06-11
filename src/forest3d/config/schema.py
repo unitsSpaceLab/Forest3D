@@ -73,6 +73,21 @@ class CropRowConfig(BaseModel):
         default="rounded",
         description="Row cross-section: flat, rounded, trapezoid",
     )
+    plant_spacing: float = Field(
+        default=0.8,
+        ge=0.05,
+        le=10.0,
+        description="Spacing between plants along a row (m); placement only",
+    )
+    stagger: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Offset of alternate rows as a fraction of plant_spacing; "
+            "placement only"
+        ),
+    )
 
 
 class TerrainConfig(BaseModel):
