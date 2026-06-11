@@ -415,6 +415,17 @@ class BaseTerrain(ABC):
         if not blender_path:
             raise RuntimeError("Blender not found")
 
+        # Clear textures from any previous run so _find_textures() only sees
+        # this blend's output. Otherwise stale maps from an earlier, unrelated
+        # run can be picked up nondeterministically by _create_sdf_file().
+        # Scoped to image files so anything else in the dir is left untouched.
+        if self.texture_path.exists():
+            for f in self.texture_path.iterdir():
+                if f.is_file() and f.suffix.lower() in (
+                    ".png", ".jpg", ".jpeg", ".exr"
+                ):
+                    f.unlink()
+
         script = f'''
 import bpy, os, shutil
 output_dir = "{self.texture_path}"
