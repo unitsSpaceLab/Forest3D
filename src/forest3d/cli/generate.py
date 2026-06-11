@@ -38,8 +38,8 @@ from forest3d.core.terrain_base import get_terrain_class, list_terrain_types
 )
 @click.option(
     "--terrain-meta", type=str, default=None,
-    help="JSON terrain metadata for structured placement: "
-         "'{\"num_rows\": 8, \"row_width\": 1.0}'"
+    help="Override config terrain geometry for this run (JSON), "
+         "e.g. '{\"plant_spacing\": 0.4}'. Useful for sweeps."
 )
 @click.option(
     "--seed", type=int, default=None,
