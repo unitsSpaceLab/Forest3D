@@ -61,11 +61,13 @@ from forest3d.cli.terrain import terrain
 from forest3d.cli.convert import convert
 from forest3d.cli.generate import generate
 from forest3d.cli.launch import launch
+from forest3d.cli.config import config
 
 main.add_command(terrain)
 main.add_command(convert)
 main.add_command(generate)
 main.add_command(launch)
+main.add_command(config)
 
 
 if __name__ == "__main__":

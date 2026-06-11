@@ -69,17 +69,17 @@ def load_config(config_path: Optional[Path] = None) -> Forest3DConfig:
     return Forest3DConfig(**config_dict)
 
 
-def save_config(config: Forest3DConfig, path: Path) -> None:
-    """Save configuration to a YAML file.
+def config_to_yaml(config: Forest3DConfig, exclude_none: bool = False) -> str:
+    """Serialize a config to a YAML string.
+
+    Derived from the schema, so it always reflects every available option.
 
     Args:
-        config: Configuration to save.
-        path: Path to save to.
+        config: Configuration to serialize.
+        exclude_none: Drop fields whose value is None (e.g. deprecated
+            backward-compat fields), for a cleaner template.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Convert to dict, handling Path objects
-    config_dict = config.model_dump()
+    config_dict = config.model_dump(exclude_none=exclude_none)
 
     def convert_paths(obj):
         if isinstance(obj, dict):
@@ -89,6 +89,18 @@ def save_config(config: Forest3DConfig, path: Path) -> None:
         return obj
 
     config_dict = convert_paths(config_dict)
+    return yaml.dump(config_dict, default_flow_style=False, sort_keys=False)
 
-    with open(path, "w") as f:
-        yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
+
+def save_config(
+    config: Forest3DConfig, path: Path, exclude_none: bool = False
+) -> None:
+    """Save configuration to a YAML file.
+
+    Args:
+        config: Configuration to save.
+        path: Path to save to.
+        exclude_none: Drop None-valued fields from the output.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(config_to_yaml(config, exclude_none=exclude_none))
