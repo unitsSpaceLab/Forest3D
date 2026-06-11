@@ -40,17 +40,6 @@ class DemConfig(BaseModel):
     enhance_scale: float = Field(
         default=6.0, ge=1.0, le=20.0, description="Enhancement scale"
     )
-    texture_blend: Optional[Path] = Field(
-        default=None,
-        description="Path to Blender file for terrain texture extraction",
-    )
-
-    @field_validator("texture_blend", mode="before")
-    @classmethod
-    def expand_texture_path(cls, v):
-        if v is None:
-            return v
-        return Path(v).expanduser().resolve()
 
 
 class CropRowConfig(BaseModel):
@@ -100,8 +89,19 @@ class TerrainConfig(BaseModel):
         default="Terrain/Ground",
         description="Name for the generated material",
     )
+    texture_blend: Optional[Path] = Field(
+        default=None,
+        description="Path to Blender file for terrain texture extraction",
+    )
     dem: DemConfig = Field(default_factory=DemConfig)
     crop_rows: CropRowConfig = Field(default_factory=CropRowConfig)
+
+    @field_validator("texture_blend", mode="before")
+    @classmethod
+    def expand_texture_blend(cls, v):
+        if v is None:
+            return v
+        return Path(v).expanduser().resolve()
 
     # Backward compatibility: accept old flat fields and migrate to dem.*
     smooth_sigma: Optional[float] = Field(default=None)

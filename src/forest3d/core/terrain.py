@@ -1,10 +1,6 @@
 """DEM-based terrain generation."""
 
 import logging
-import os
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -13,7 +9,10 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from forest3d.config.schema import TerrainConfig
-from forest3d.core.terrain_base import BaseTerrain, register_terrain
+from forest3d.core.terrain_base import (
+    BaseTerrain,
+    register_terrain,
+)
 
 try:
     from osgeo import gdal
@@ -23,37 +22,6 @@ except ImportError:
     GDAL_AVAILABLE = False
 
 logger = logging.getLogger("forest3d.terrain")
-
-
-def find_blender() -> Optional[Path]:
-    """Auto-detect Blender installation."""
-    blender_in_path = shutil.which("blender")
-    if blender_in_path:
-        return Path(blender_in_path)
-
-    common_paths = [
-        Path("/usr/bin/blender"),
-        Path("/usr/local/bin/blender"),
-        Path("/snap/bin/blender"),
-        Path("/opt/blender/blender"),
-        Path.home() / "blender" / "blender",
-    ]
-
-    for base in [Path.home() / "Downloads", Path("/opt"), Path.home()]:
-        if base.exists():
-            try:
-                for item in base.iterdir():
-                    if item.is_dir() and item.name.lower().startswith("blender"):
-                        blender_exec = item / "blender"
-                        if blender_exec.exists() and blender_exec.is_file():
-                            common_paths.append(blender_exec)
-            except PermissionError:
-                continue
-
-    for path in common_paths:
-        if path.exists() and path.is_file():
-            return path
-    return None
 
 
 @register_terrain
@@ -79,7 +47,6 @@ class DemTerrain(BaseTerrain):
             raise FileNotFoundError(f"DEM file not found: {self.tif_path}")
 
         self.config = config or TerrainConfig()
-        self._blender_path = blender_path
         self._material_name = self.config.material_name
 
         if output_path:
@@ -87,7 +54,7 @@ class DemTerrain(BaseTerrain):
         else:
             terrain_path = self.tif_path.parent.parent
 
-        super().__init__(terrain_path, config)
+        super().__init__(terrain_path, config, blender_path)
 
     # --- CLI integration ---
 
@@ -140,14 +107,9 @@ class DemTerrain(BaseTerrain):
         if kwargs.get("enhance") is not None:
             tc.dem.enhance = kwargs["enhance"]
         if kwargs.get("texture") is not None:
-            tc.dem.texture_blend = Path(kwargs["texture"])
+            tc.texture_blend = Path(kwargs["texture"])
         if kwargs.get("blender") is not None:
             config.blender.path = Path(kwargs["blender"])
-
-    @classmethod
-    def cli_post_process(cls, instance, config) -> None:
-        if config.terrain.dem.texture_blend:
-            instance.extract_terrain_texture(config.terrain.dem.texture_blend)
 
     # --- World-population defaults (forest environment) ---
 
@@ -372,58 +334,6 @@ class DemTerrain(BaseTerrain):
             f"Y={stats['y_extent']:.2f}, Z={stats['z_extent']:.2f}"
         )
         return stl_path, stats
-
-    # --- Texture extraction ---
-
-    def extract_terrain_texture(self, blend_file: Path) -> List[Path]:
-        """Extract textures from Blender file for PBR materials."""
-        blend_file = Path(blend_file)
-        if not blend_file.exists():
-            raise FileNotFoundError(f"Blend file not found: {blend_file}")
-
-        blender_path = self._blender_path or find_blender()
-        if not blender_path:
-            raise RuntimeError("Blender not found")
-
-        script = f'''
-import bpy, os, shutil
-output_dir = "{self.texture_path}"
-bpy.ops.wm.open_mainfile(filepath="{blend_file}")
-for img in bpy.data.images:
-    if img.source == 'FILE' and img.filepath:
-        fp = bpy.path.abspath(img.filepath)
-        if os.path.exists(fp):
-            fn = os.path.basename(fp)
-            if fn.lower().endswith('.exr'):
-                img.file_format = 'PNG'
-                fn = fn.rsplit('.', 1)[0] + '.png'
-                img.save_render(os.path.join(output_dir, fn))
-            else:
-                shutil.copy2(fp, os.path.join(output_dir, fn))
-            print(f"EXPORTED: {{fn}}")
-    elif img.packed_file:
-        fn = img.name if '.' in img.name else img.name + '.png'
-        img.save_render(os.path.join(output_dir, fn))
-        print(f"EXPORTED: {{fn}}")
-'''
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(script)
-            script_path = f.name
-
-        try:
-            subprocess.run(
-                [str(blender_path), "--background", "--python", script_path],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-        finally:
-            os.unlink(script_path)
-
-        textures = self._find_textures()
-        if textures:
-            self._create_sdf_file(textures)
-        return [self.texture_path / t for t in textures]
 
 
 # Backward compatibility alias

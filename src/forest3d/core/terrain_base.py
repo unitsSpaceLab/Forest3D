@@ -1,6 +1,10 @@
 """Abstract base class for all terrain generators."""
 
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
@@ -15,6 +19,38 @@ from stl import mesh as stl_mesh
 from forest3d.config.schema import TerrainConfig
 
 logger = logging.getLogger("forest3d.terrain")
+
+
+def find_blender() -> Optional[Path]:
+    """Auto-detect Blender installation."""
+    blender_in_path = shutil.which("blender")
+    if blender_in_path:
+        return Path(blender_in_path)
+
+    common_paths = [
+        Path("/usr/bin/blender"),
+        Path("/usr/local/bin/blender"),
+        Path("/snap/bin/blender"),
+        Path("/opt/blender/blender"),
+        Path.home() / "blender" / "blender",
+    ]
+
+    for base in [Path.home() / "Downloads", Path("/opt"), Path.home()]:
+        if base.exists():
+            try:
+                for item in base.iterdir():
+                    if item.is_dir() and item.name.lower().startswith("blender"):
+                        blender_exec = item / "blender"
+                        if blender_exec.exists() and blender_exec.is_file():
+                            common_paths.append(blender_exec)
+            except PermissionError:
+                continue
+
+    for path in common_paths:
+        if path.exists() and path.is_file():
+            return path
+
+    return None
 
 
 class BaseTerrain(ABC):
@@ -34,8 +70,10 @@ class BaseTerrain(ABC):
         self,
         output_path: Path,
         config: Optional[TerrainConfig] = None,
+        blender_path: Optional[Path] = None,
     ):
         self.config = config or TerrainConfig()
+        self._blender_path = blender_path
         self.output_path = Path(output_path)
         self.mesh_path = self.output_path / "mesh"
         self.material_path = self.output_path / "material"
@@ -92,9 +130,11 @@ class BaseTerrain(ABC):
     def cli_post_process(cls, instance, config) -> None:
         """Run after terrain generation, before the success message.
 
-        Override for type-specific post-processing (e.g. DEM texture
-        extraction). The base implementation is a no-op.
+        Override for type-specific post-processing.  The base
+        implementation handles shared logic like texture extraction.
         """
+        if config.terrain.texture_blend:
+            instance.extract_terrain_texture(config.terrain.texture_blend)
 
     # --- World-population defaults (override per terrain type) ---
 
@@ -364,6 +404,56 @@ class BaseTerrain(ABC):
         path = self.output_path / "test.world"
         path.write_text(content)
         return path
+
+    def extract_terrain_texture(self, blend_file: Path) -> List[Path]:
+        """Extract textures from Blender file for PBR materials."""
+        blend_file = Path(blend_file)
+        if not blend_file.exists():
+            raise FileNotFoundError(f"Blend file not found: {blend_file}")
+
+        blender_path = self._blender_path or find_blender()
+        if not blender_path:
+            raise RuntimeError("Blender not found")
+
+        script = f'''
+import bpy, os, shutil
+output_dir = "{self.texture_path}"
+bpy.ops.wm.open_mainfile(filepath="{blend_file}")
+for img in bpy.data.images:
+    if img.source == 'FILE' and img.filepath:
+        fp = bpy.path.abspath(img.filepath)
+        if os.path.exists(fp):
+            fn = os.path.basename(fp)
+            if fn.lower().endswith('.exr'):
+                img.file_format = 'PNG'
+                fn = fn.rsplit('.', 1)[0] + '.png'
+                img.save_render(os.path.join(output_dir, fn))
+            else:
+                shutil.copy2(fp, os.path.join(output_dir, fn))
+            print(f"EXPORTED: {{fn}}")
+    elif img.packed_file:
+        fn = img.name if '.' in img.name else img.name + '.png'
+        img.save_render(os.path.join(output_dir, fn))
+        print(f"EXPORTED: {{fn}}")
+'''
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(script)
+            script_path = f.name
+
+        try:
+            subprocess.run(
+                [str(blender_path), "--background", "--python", script_path],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        finally:
+            os.unlink(script_path)
+
+        textures = self._find_textures()
+        if textures:
+            self._create_sdf_file(textures)
+        return [self.texture_path / t for t in textures]
 
     def process_terrain(self, **kwargs) -> Path:
         """Full pipeline: generate mesh, SDF model, config, test world."""

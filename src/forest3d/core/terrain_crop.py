@@ -40,8 +40,9 @@ class CropRowTerrain(BaseTerrain):
         output_path: Path,
         config: Optional[TerrainConfig] = None,
         row_params: Optional[CropRowParams] = None,
+        blender_path: Optional[Path] = None,
     ):
-        super().__init__(output_path, config)
+        super().__init__(output_path, config, blender_path)
         self.params = row_params or CropRowParams()
 
     # --- CLI integration ---
@@ -79,6 +80,14 @@ class CropRowTerrain(BaseTerrain):
                 default=None,
                 help="Row cross-section profile (default: rounded)",
             ),
+            click.Option(
+                ["--texture"], type=click.Path(exists=True),
+                help="Path to Blender file for terrain texture",
+            ),
+            click.Option(
+                ["--blender"], type=click.Path(exists=True),
+                help="Path to Blender executable (auto-detected if not set)",
+            ),
         ]
 
     @classmethod
@@ -97,7 +106,13 @@ class CropRowTerrain(BaseTerrain):
             resolution=cr.resolution,
             row_profile=kwargs.get("row_profile") or cr.row_profile,
         )
-        return cls(output_path=output_path, config=config, row_params=params)
+        blender = kwargs.get("blender")
+        return cls(
+            output_path=output_path,
+            config=config,
+            row_params=params,
+            blender_path=Path(blender) if blender else None,
+        )
 
     @classmethod
     def cli_apply_overrides(cls, config, kwargs) -> None:
@@ -113,6 +128,10 @@ class CropRowTerrain(BaseTerrain):
         ):
             if kwargs.get(k) is not None:
                 setattr(cr, k, kwargs[k])
+        if kwargs.get("texture") is not None:
+            config.terrain.texture_blend = Path(kwargs["texture"])
+        if kwargs.get("blender") is not None:
+            config.blender.path = Path(kwargs["blender"])
 
     # --- World-population defaults (agricultural environment) ---
 
