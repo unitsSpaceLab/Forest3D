@@ -1,3 +1,5 @@
+
+
 # Forest3D - Terrain and Forest Generation for Gazebo
 
 Forest3D eliminates the manual overhead of building realistic simulation environments. Using DEM terrain data and Blender assets, it automatically generates collision-accurate Gazebo worlds with procedurally placed vegetation, rocks, and trees—ensuring both visual realism and physical fidelity for simulation.
@@ -176,25 +178,36 @@ forest3d -c config.yaml ...        # Use config file
 
 ## Configuration
 
-Create `forest3d.yaml` in your project directory:
+Generate a `forest3d.yaml` template instead of writing one by hand — the
+template is derived from the config schema, so it always reflects every
+available option:
+
+```bash
+forest3d config init crop_rows    # crop-field template
+forest3d config init dem          # forest (DEM) template
+forest3d config show              # print the effective config and its source
+```
+
+`config init` scopes the template to the chosen terrain type, so a crop user
+isn't handed forest options (and vice versa). Forest3D auto-discovers
+`forest3d.yaml` from the project root, so once it exists the commands pick it
+up with no flag. A crop-row config looks like:
 
 ```yaml
 terrain:
-  scale_factor: 1.0
-  smooth_sigma: 1.0
-  enhance: false
-
+  type: crop_rows
+  crop_rows:
+    num_rows: 12
+    row_width: 1.0
+    furrow_width: 0.5
+    plant_spacing: 0.4
 density:
-  tree: 50
-  bush: 10
-  rock: 5
-  grass: 50
-  sand: 5
-
-blender:
-  visual_decimation: 0.1
-  collision_decimation: 0.01
+  crop: 200
 ```
+
+With `terrain.type` set, `forest3d generate` selects the environment and
+density straight from the file — no `--terrain-type` or `-d` needed. Override
+any value per-run with the matching flag.
 
 See `configs/examples/` for preset configurations.
 
