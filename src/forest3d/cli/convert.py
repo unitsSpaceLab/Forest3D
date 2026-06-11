@@ -23,8 +23,8 @@ def known_categories() -> list:
     help="Directory containing Blender files (or parent with category subfolders)"
 )
 @click.option(
-    "--output", "-o", "output_dir", type=click.Path(), required=True,
-    help="Output directory for Gazebo models"
+    "--output", "-o", "output_dir", type=click.Path(), default="./models",
+    show_default=True, help="Output directory for Gazebo models"
 )
 @click.option(
     "--blender", "-b", "blender_path", type=click.Path(exists=True),
@@ -32,7 +32,7 @@ def known_categories() -> list:
 )
 @click.option(
     "--category", "-c", type=click.Choice(known_categories()),
-    default=None, help="Model category (auto-detected from folder name if not specified)"
+    default=None, help="Model category (inferred from input folder name if not specified)"
 )
 @click.pass_context
 def convert(ctx, input_dir, output_dir, blender_path, category):
@@ -130,7 +130,17 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
                 f"  • Subfolders named: {', '.join(known_categories())}"
             )
 
-        cat = category or "tree"
+        if category:
+            cat = category
+        elif input_path.name.lower() in known_categories():
+            cat = input_path.name.lower()
+        else:
+            raise click.ClickException(
+                f"Could not infer category from folder name "
+                f"'{input_path.name}'.\n"
+                f"Specify one with -c, e.g. -c tree.\n"
+                f"Known categories: {', '.join(known_categories())}"
+            )
 
         console.print(
             f"Found [bold]{len(blend_files)}[/bold] Blender files to process"
