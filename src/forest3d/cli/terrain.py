@@ -65,11 +65,20 @@ def _build_terrain_cmd(terrain_type: str, cls: type) -> click.Command:
     ]
     params.extend(cls.cli_options())
 
+    help_text = f"Generate {terrain_type} terrain."
+    categories = list(cls.default_categories().keys())
+    if categories:
+        help_text += (
+            "\n\n\b\nAsset categories (place .blend files in "
+            "Blender-Assets/<category>/):\n    "
+            + ", ".join(categories)
+        )
+
     return click.Command(
         name=terrain_type,
         callback=handler,
         params=params,
-        help=f"Generate {terrain_type} terrain.",
+        help=help_text,
     )
 
 
