@@ -115,7 +115,6 @@ class TerrainConfig(BaseModel):
             return v
         return Path(v).expanduser().resolve()
 
-    # Backward compatibility: accept old flat fields and migrate to dem.*
     smooth_sigma: Optional[float] = Field(default=None)
     enhance: Optional[bool] = Field(default=None)
     enhance_scale: Optional[float] = Field(default=None)
@@ -138,8 +137,6 @@ class TerrainConfig(BaseModel):
                 "terrain.enhance_scale is deprecated, use terrain.dem.enhance_scale"
             )
             self.dem.enhance_scale = self.enhance_scale
-        # Strip legacy fields from the instance so they never appear in
-        # serialized output.
         for f in ("smooth_sigma", "enhance", "enhance_scale"):
             try:
                 delattr(self, f)

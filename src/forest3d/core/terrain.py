@@ -56,8 +56,6 @@ class DemTerrain(BaseTerrain):
 
         super().__init__(terrain_path, config, blender_path)
 
-    # --- CLI integration ---
-
     @classmethod
     def cli_options(cls) -> list:
         return [
@@ -110,8 +108,6 @@ class DemTerrain(BaseTerrain):
             tc.texture_blend = Path(kwargs["texture"])
         if kwargs.get("blender") is not None:
             config.blender.path = Path(kwargs["blender"])
-
-    # --- World-population defaults (forest environment) ---
 
     @classmethod
     def default_categories(cls) -> Dict:
@@ -241,8 +237,6 @@ class DemTerrain(BaseTerrain):
     def default_densities(cls) -> Dict[str, int]:
         return {"tree": 50, "rock": 5, "bush": 10, "grass": 50, "sand": 5}
 
-    # --- DEM-specific operations ---
-
     def enhance_dem(self, scale_factor: float = 6.0) -> Path:
         output_tiff = self.tif_path.parent / "terrain_enhanced.tif"
         ds = gdal.Open(str(self.tif_path))
@@ -258,8 +252,6 @@ class DemTerrain(BaseTerrain):
         )
         logger.info(f"Enhanced DEM saved to: {output_tiff}")
         return output_tiff
-
-    # --- Mesh generation ---
 
     def generate_terrain_mesh(
         self,
@@ -279,7 +271,6 @@ class DemTerrain(BaseTerrain):
         )
         enhance = enhance if enhance is not None else self.config.enhance
 
-        # Load DEM
         if enhance:
             dem_file = self.enhance_dem(self.config.enhance_scale)
         else:
@@ -300,7 +291,6 @@ class DemTerrain(BaseTerrain):
         rows, cols = elevation.shape
         logger.info(f"Creating mesh from {rows}x{cols} DEM...")
 
-        # Build mesh from heightmap
         pixel_width *= scale_factor
         pixel_height *= scale_factor
         vertices, uvs, faces = self._build_mesh_from_heightmap(
@@ -309,15 +299,12 @@ class DemTerrain(BaseTerrain):
 
         self._center_and_shift(vertices)
 
-        # Calculate normals
         normals = self._calculate_normals(vertices, faces)
 
-        # Save OBJ (visual)
         obj_path = self.mesh_path / "terrain.obj"
         self._write_obj(obj_path, vertices, uvs, normals, faces)
         logger.info(f"Created OBJ mesh: {obj_path}")
 
-        # Save STL (collision)
         stl_path = self.mesh_path / "terrain.stl"
         self._write_stl(stl_path, vertices, faces)
         logger.info(f"Created STL mesh: {stl_path}")
@@ -336,5 +323,4 @@ class DemTerrain(BaseTerrain):
         return stl_path, stats
 
 
-# Backward compatibility alias
 TerrainGenerator = DemTerrain

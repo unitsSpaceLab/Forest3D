@@ -64,13 +64,9 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
     logger = ctx.obj["logger"]
     config = load_config(ctx.obj.get("config_path"))
 
-    # Terrain type: the --terrain-type flag wins; otherwise fall back to the
-    # config file (terrain.type, which defaults to "dem"). This lets a config
-    # fully select the environment without repeating the flag.
     if not terrain_type:
         terrain_type = config.terrain.type
 
-    # Parse density JSON if provided
     parsed_density: Optional[Dict[str, int]] = None
     if density:
         try:
@@ -78,10 +74,6 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
         except json.JSONDecodeError as e:
             raise click.ClickException(f"Invalid JSON for density: {e}")
 
-    # Parse terrain metadata JSON if provided
-    # Seed placement geometry from the crop-rows config so the terrain mesh
-    # and crop placement share one source of truth. --terrain-meta then
-    # overrides individual keys for one-off runs.
     meta = None
     if terrain_type == "crop_rows":
         cr = config.terrain.crop_rows
@@ -102,10 +94,6 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             )
         meta = {**meta, **overrides} if meta else overrides
 
-    # Build density config: start from the terrain type's class defaults,
-    # overlay densities the user explicitly set in the config file (but only
-    # for categories this terrain type uses, so schema defaults like crop: 0
-    # don't clobber class defaults), then apply --density overrides.
     cls = get_terrain_class(terrain_type)
     density_config = dict(cls.default_densities())
     for key in config.density.model_fields_set:
@@ -131,7 +119,6 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             "  - etc."
         )
 
-    # Display density configuration
     table = Table(title="Density Configuration", show_header=True)
     table.add_column("Category", style="cyan")
     table.add_column("Count", justify="right")
@@ -143,7 +130,6 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
     console.print(table)
     console.print()
 
-    # Track progress
     progress_state = {"progress": None, "task": None}
 
     def progress_callback(percent, description):
@@ -187,7 +173,6 @@ def generate(ctx, base_path, terrain_type, density, output, verbose, terrain_met
             logger.error(f"World generation failed: {e}")
             raise click.ClickException(str(e))
 
-    # Display results
     console.print()
     console.print(
         f"[green]Success![/green] World created at: {world_path}"

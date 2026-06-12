@@ -114,7 +114,7 @@ class AssetExporter:
         return asset_dir
 
     def _export_glb(self, blend_file: Path, output_path: Path, collision_path: Path) -> None:
-        """Export glTF binary (.glb) for visual and collision meshes."""
+        """Export glTF binary for visual and collision meshes."""
         blender_script = f'''
 import bpy
 
@@ -180,7 +180,7 @@ prepare_and_export("{collision_path}", {self.collision_decimation}, include_text
             os.unlink(script_path)
 
     def _create_sdf_file(self, model_name: str, model_dir: Path) -> Path:
-        """Create SDF file using glTF meshes."""
+        """Create SDF model file."""
         sdf_content = f'''<?xml version="1.0" ?>
 <sdf version="1.8">
     <model name="{model_name}">
@@ -221,7 +221,7 @@ prepare_and_export("{collision_path}", {self.collision_decimation}, include_text
         return config_path
 
     def _create_test_world(self, model_name: str, model_dir: Path, category: str) -> Path:
-        """Create test world file."""
+        """Create test world file for Gazebo."""
         from xml.etree import ElementTree as ET
         from forest3d.utils.sdf import create_world_base, add_ground_plane, write_world_file
 

@@ -45,8 +45,6 @@ class CropRowTerrain(BaseTerrain):
         super().__init__(output_path, config, blender_path)
         self.params = row_params or CropRowParams()
 
-    # --- CLI integration ---
-
     @classmethod
     def cli_options(cls) -> list:
         return [
@@ -133,8 +131,6 @@ class CropRowTerrain(BaseTerrain):
         if kwargs.get("blender") is not None:
             config.blender.path = Path(kwargs["blender"])
 
-    # --- World-population defaults (agricultural environment) ---
-
     @classmethod
     def default_categories(cls) -> Dict:
         return {
@@ -210,7 +206,7 @@ class CropRowTerrain(BaseTerrain):
         return {"crop": 200, "weed": 50, "irrigation": 5}
 
     def _build_row_heightmap(self) -> Tuple[np.ndarray, float, float]:
-        """Generate a heightmap with alternating raised rows and furrows."""
+        """Generate heightmap with alternating rows and furrows."""
         p = self.params
 
         cols = max(2, int(p.field_length / p.resolution))
@@ -220,10 +216,8 @@ class CropRowTerrain(BaseTerrain):
         cycle = p.row_width + p.furrow_width
         half_row = p.row_width / 2.0
 
-        # Row centres start at headland + half row width
         for i in range(p.num_rows):
             centre = p.headland_width + half_row + i * cycle
-            # Clamp to grid
             centre_idx = int(centre / p.resolution)
             half_row_idx = int(half_row / p.resolution)
             if centre_idx - half_row_idx >= rows:

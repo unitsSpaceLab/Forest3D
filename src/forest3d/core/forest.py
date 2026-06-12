@@ -17,12 +17,7 @@ logger = logging.getLogger("forest3d.forest")
 
 
 class WorldPopulator:
-    """Procedurally generate worlds with intelligent model placement.
-
-    Places models on terrain using zone weighting, distance constraints,
-    and natural clustering patterns.  Handles cross-category collision
-    avoidance and scale-aware spacing.
-    """
+    """Procedural world generation with intelligent model placement."""
 
     def __init__(
         self,
@@ -33,24 +28,12 @@ class WorldPopulator:
         cross_distances: Optional[Dict[Tuple[str, str], float]] = None,
         seed: Optional[int] = None,
     ):
-        """Initialize the world populator.
-
-        Args:
-            base_path: Project base path containing models/ and worlds/.
-            progress_callback: Optional callback (percent, message).
-            terrain_type: Registered terrain type name. Loads default
-                categories and strategies from that terrain class.
-                Falls back to forest defaults (backward compat) when None.
-            category_config: Per-category behaviour overrides.
-            cross_distances: Cross-category distance overrides.
-        """
         self.base_path = Path(base_path)
         self.models_path = self.base_path / "models"
         self.worlds_path = self.base_path / "worlds"
         self.progress_callback = progress_callback
         self._seed = seed
 
-        # Load defaults from terrain type, or fall back to forest defaults
         if terrain_type:
             cls = get_terrain_class(terrain_type)
             self.cat_config = deepcopy(cls.default_categories())
@@ -58,14 +41,12 @@ class WorldPopulator:
             self._category_order = list(cls.default_category_order())
             base_cross = dict(cls.default_cross_distances())
         else:
-            # Backward compat: use DemTerrain defaults (single source of truth)
             from forest3d.core.terrain import DemTerrain
             self.cat_config = deepcopy(DemTerrain.default_categories())
             self._strategies = dict(DemTerrain.default_strategies())
             self._category_order = list(DemTerrain.default_category_order())
             base_cross = dict(DemTerrain.default_cross_distances())
 
-        # Merge user-provided config over defaults
         if category_config:
             for cat, cfg in category_config.items():
                 if cat in self.cat_config:
@@ -77,17 +58,12 @@ class WorldPopulator:
             base_cross.update(cross_distances)
         self._cross_distances = base_cross
 
-        # Store (x, y, z, scale) for each placed model
         self.placed_models: Dict[str, List[Tuple[float, float, float, float]]] = {
             cat: [] for cat in self.cat_config
         }
 
         self._verify_paths()
         self.model_variants = self._get_model_variants()
-
-    # ------------------------------------------------------------------
-    # Path / variant helpers
-    # ------------------------------------------------------------------
 
     def _verify_paths(self) -> None:
         """Verify all required paths exist."""
@@ -141,10 +117,6 @@ class WorldPopulator:
             raise FileNotFoundError(f"Terrain mesh not found at: {mesh_path}")
         return mesh.Mesh.from_file(str(mesh_path))
 
-    # ------------------------------------------------------------------
-    # Scene helpers
-    # ------------------------------------------------------------------
-
     def _add_scene_settings(self, world: ET.Element) -> None:
         scene = ET.SubElement(world, "scene")
         ET.SubElement(scene, "ambient").text = "0.4 0.4 0.4 1"
@@ -173,44 +145,26 @@ class WorldPopulator:
         ET.SubElement(pa, "linear").text = "0.01"
         ET.SubElement(pa, "quadratic").text = "0.001"
 
-    # ------------------------------------------------------------------
-    # Main world generation
-    # ------------------------------------------------------------------
-
     def create_forest_world(
         self,
         density_config: Optional[Dict[str, int]] = None,
         terrain_meta: Optional[Dict] = None,
         output_path: Optional[Path] = None,
     ) -> Path:
-        """Create a world file with placed models.
-
-        Args:
-            density_config: Dict of category -> count.  Uses defaults if None.
-            terrain_meta: Optional metadata (e.g. row geometry for crops).
-            output_path: Where to write the world file.  Defaults to
-                ``worlds/forest_world.world`` under the project base.
-
-        Returns:
-            Path to the generated world file.
-        """
+        """Create a world file with placed models."""
         from forest3d.utils.sdf import create_world_base, write_world_file
 
-        # Reset placed models
         for cat in self.placed_models:
             self.placed_models[cat] = []
 
-        # Density defaults
         if density_config is None:
             cfg = DensityConfig()
             density_config = cfg.as_dict()
 
-        # World base
         world_elem, world = create_world_base("forest_world")
         self._add_scene_settings(world)
         self._add_extra_lighting(world)
 
-        # Terrain include
         terrain = ET.SubElement(world, "include")
         ET.SubElement(terrain, "uri").text = "model://ground"
         ET.SubElement(terrain, "name").text = "terrain"
@@ -218,7 +172,6 @@ class WorldPopulator:
 
         terrain_mesh = self._get_terrain_mesh()
 
-        # Place models category-by-category via strategy registry
         category_order = self._category_order
         total_models = sum(density_config.get(c, 0) for c in category_order)
         models_placed = 0
@@ -293,10 +246,6 @@ class WorldPopulator:
                 logger.info(f"  - {cat}: {len(self.placed_models[cat])}")
 
         return output_path
-
-    # ------------------------------------------------------------------
-    # Statistics
-    # ------------------------------------------------------------------
 
     def get_model_statistics(self) -> Dict:
         stats = {

@@ -18,11 +18,7 @@ CONFIG_SEARCH_PATHS = [
 
 
 def find_config_file() -> Optional[Path]:
-    """Search for configuration file in standard locations.
-
-    Returns:
-        Path to config file if found, None otherwise.
-    """
+    """Search for config file in standard locations."""
     for path in CONFIG_SEARCH_PATHS:
         if path.exists():
             return path
@@ -30,23 +26,9 @@ def find_config_file() -> Optional[Path]:
 
 
 def load_config(config_path: Optional[Path] = None) -> Forest3DConfig:
-    """Load configuration with cascading defaults.
-
-    Priority (highest to lowest):
-    1. Environment variables (FOREST3D_*)
-    2. Explicit config file path
-    3. Auto-discovered config file
-    4. Built-in defaults
-
-    Args:
-        config_path: Optional path to configuration file.
-
-    Returns:
-        Validated Forest3DConfig instance.
-    """
+    """Load config with cascading defaults (env > explicit > auto > built-in)."""
     config_dict: dict = {}
 
-    # Load from file if specified or found
     if config_path is None:
         config_path = find_config_file()
     elif not isinstance(config_path, Path):
@@ -56,7 +38,6 @@ def load_config(config_path: Optional[Path] = None) -> Forest3DConfig:
         with open(config_path) as f:
             config_dict = yaml.safe_load(f) or {}
 
-    # Environment variable overrides
     if env_blender := os.environ.get("FOREST3D_BLENDER_PATH"):
         config_dict.setdefault("blender", {})["path"] = env_blender
 
@@ -70,15 +51,7 @@ def load_config(config_path: Optional[Path] = None) -> Forest3DConfig:
 
 
 def config_to_yaml(config: Forest3DConfig, exclude_none: bool = False) -> str:
-    """Serialize a config to a YAML string.
-
-    Derived from the schema, so it always reflects every available option.
-
-    Args:
-        config: Configuration to serialize.
-        exclude_none: Drop fields whose value is None (e.g. deprecated
-            backward-compat fields), for a cleaner template.
-    """
+    """Serialize config to YAML string."""
     config_dict = config.model_dump(exclude_none=exclude_none)
 
     def convert_paths(obj):
@@ -95,12 +68,6 @@ def config_to_yaml(config: Forest3DConfig, exclude_none: bool = False) -> str:
 def save_config(
     config: Forest3DConfig, path: Path, exclude_none: bool = False
 ) -> None:
-    """Save configuration to a YAML file.
-
-    Args:
-        config: Configuration to save.
-        path: Path to save to.
-        exclude_none: Drop None-valued fields from the output.
-    """
+    """Save configuration to a YAML file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(config_to_yaml(config, exclude_none=exclude_none))

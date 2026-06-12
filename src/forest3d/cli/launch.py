@@ -10,17 +10,11 @@ from forest3d.config.loader import load_config
 
 
 def find_gazebo() -> tuple[str, str]:
-    """Find Gazebo executable (Harmonic or Classic).
-
-    Returns:
-        Tuple of (executable_path, version_name)
-    """
-    # Check for Gazebo Harmonic (gz sim)
+    """Find Gazebo executable. Returns (path, version_name)."""
     gz_sim = shutil.which("gz")
     if gz_sim:
         return gz_sim, "harmonic"
 
-    # Check for Gazebo Classic
     gazebo_classic = shutil.which("gazebo")
     if gazebo_classic:
         return gazebo_classic, "classic"
@@ -69,7 +63,6 @@ def launch(ctx, world_path, base_path, verbose):
     console = ctx.obj["console"]
     logger = ctx.obj["logger"]
 
-    # Find Gazebo
     gz_path, gz_version = find_gazebo()
 
     if not gz_path:
@@ -82,7 +75,6 @@ def launch(ctx, world_path, base_path, verbose):
             "             -v $(pwd):/workspace forest3d launch"
         )
 
-    # Determine paths
     project_base = Path(base_path) if base_path else Path.cwd()
     models_path = project_base / "models"
     worlds_path = project_base / "worlds"
@@ -90,7 +82,6 @@ def launch(ctx, world_path, base_path, verbose):
     if not models_path.exists():
         raise click.ClickException(f"Models directory not found: {models_path}")
 
-    # Determine world file
     if world_path:
         world_file = Path(world_path)
     else:
@@ -107,31 +98,26 @@ def launch(ctx, world_path, base_path, verbose):
     console.print(f"  Models: [cyan]{models_path}[/cyan]")
     console.print()
 
-    # Set up environment
     env = os.environ.copy()
 
     if gz_version == "harmonic":
-        # Gazebo Harmonic uses GZ_SIM_RESOURCE_PATH
         existing_path = env.get("GZ_SIM_RESOURCE_PATH", "")
         if existing_path:
             env["GZ_SIM_RESOURCE_PATH"] = f"{models_path}:{existing_path}"
         else:
             env["GZ_SIM_RESOURCE_PATH"] = str(models_path)
 
-        # Build command for Gazebo Harmonic
         cmd = [gz_path, "sim", str(world_file)]
 
         if verbose:
             cmd.insert(2, "-v4")
     else:
-        # Gazebo Classic uses GAZEBO_MODEL_PATH
         existing_path = env.get("GAZEBO_MODEL_PATH", "")
         if existing_path:
             env["GAZEBO_MODEL_PATH"] = f"{models_path}:{existing_path}"
         else:
             env["GAZEBO_MODEL_PATH"] = str(models_path)
 
-        # Build command for Gazebo Classic
         cmd = [gz_path, str(world_file)]
 
         if verbose:
@@ -142,7 +128,6 @@ def launch(ctx, world_path, base_path, verbose):
     try:
         console.print("[dim]Starting Gazebo... (press Ctrl+C to exit)[/dim]")
 
-        # Run Gazebo
         result = subprocess.run(
             cmd,
             env=env,

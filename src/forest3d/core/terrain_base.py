@@ -56,12 +56,7 @@ def find_blender() -> Optional[Path]:
 class BaseTerrain(ABC):
     """Base class for terrain generators.
 
-    Every terrain type produces:
-      - mesh/terrain.obj   (visual with UVs)
-      - mesh/terrain.stl   (collision + height sampling)
-      - model.sdf
-      - model.config
-      - test.world
+    Produces: mesh/terrain.obj, mesh/terrain.stl, model.sdf, model.config, test.world
     """
 
     TERRAIN_TYPE = "base"
@@ -84,95 +79,59 @@ class BaseTerrain(ABC):
         for path in [self.mesh_path, self.material_path, self.texture_path]:
             path.mkdir(parents=True, exist_ok=True)
 
-    # --- Subclasses must implement ---
-
     @abstractmethod
     def generate_terrain_mesh(
         self,
         **kwargs,
     ) -> Tuple[Path, dict]:
-        """Generate OBJ (visual) and STL (collision) meshes.
-
-        Returns:
-            Tuple of (stl_path, stats_dict).
-        """
-
-    # --- CLI integration (override per type) ---
+        """Generate OBJ and STL meshes. Returns (stl_path, stats_dict)."""
 
     @classmethod
     def cli_options(cls) -> list:
-        """Return click.Option definitions for this terrain type.
-
-        Used by the CLI to build the subcommand dynamically.
-        Override in subclasses to declare type-specific arguments.
-        """
+        """Return click.Option definitions for this terrain type."""
         return []
 
     @classmethod
     def cli_create(cls, output_path: Path, config, **kwargs):
-        """Build an instance from CLI keyword arguments.
-
-        Override in subclasses whose ``__init__`` signature differs
-        from ``cls(output_path=..., config=...)``.
-        """
+        """Build an instance from CLI kwargs."""
         return cls(output_path=output_path, config=config)
 
     @classmethod
     def cli_apply_overrides(cls, config, kwargs) -> None:
-        """Push CLI flag values into the config object *in place*.
-
-        Override to map CLI kwargs (dashed → underscored) to
-        ``config.terrain.*`` fields before the terrain instance is built.
-        The base implementation is a no-op.
-        """
+        """Push CLI flag values into config object in place."""
 
     @classmethod
     def cli_post_process(cls, instance, config) -> None:
-        """Run after terrain generation, before the success message.
-
-        Override for type-specific post-processing.  The base
-        implementation handles shared logic like texture extraction.
-        """
+        """Run after terrain generation, before success message."""
         if config.terrain.texture_blend:
             instance.extract_terrain_texture(config.terrain.texture_blend)
 
-    # --- World-population defaults (override per terrain type) ---
-
     @classmethod
     def default_categories(cls) -> Dict[str, dict]:
-        """Per-category configuration for ``WorldPopulator``.
-
-        Each entry may contain: scale_range, min_distance, zone_weights, rotation.
-        """
+        """Per-category config for WorldPopulator."""
         return {}
 
     @classmethod
     def default_strategies(cls) -> Dict[str, "PlacementStrategy"]:
-        """Placement strategies keyed by category name.
-
-        Used by ``WorldPopulator`` to dispatch placement per category.
-        Import ``PlacementStrategy`` lazily to avoid circular imports.
-        """
+        """Placement strategies keyed by category."""
         return {}
 
     @classmethod
     def default_cross_distances(cls) -> Dict[Tuple[str, str], float]:
-        """Cross-category minimum distances (order-insensitive)."""
+        """Cross-category minimum distances."""
         return {}
 
     @classmethod
     def default_category_order(cls) -> List[str]:
-        """Order in which categories are placed by ``WorldPopulator``."""
+        """Category placement order."""
         return list(cls.default_categories().keys())
 
     @classmethod
     def default_densities(cls) -> Dict[str, int]:
-        """Default model counts per category for this terrain type.
-        Override to provide sensible defaults without requiring ``--density``.
-        """
+        """Default model counts per category."""
         return {}
 
-    # --- Shared helpers ---
+
 
     def _build_mesh_from_heightmap(
         self,
@@ -182,7 +141,7 @@ class BaseTerrain(ABC):
         z_scale: float = 1.0,
         uv_tile_scale: float = 10.0,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Convert a 2D heightmap into vertices, UVs, and faces."""
+        """Convert 2D heightmap to vertices, UVs, and faces."""
         rows, cols = elevation.shape
         vertices = []
         uvs = []
@@ -209,7 +168,7 @@ class BaseTerrain(ABC):
         return np.array(vertices), np.array(uvs), np.array(faces)
 
     def _center_and_shift(self, vertices: np.ndarray) -> None:
-        """Center XY and shift Z to zero, in-place."""
+        """Center XY and shift Z to zero in-place."""
         center_xy = np.mean(vertices[:, :2], axis=0)
         vertices[:, 0] -= center_xy[0]
         vertices[:, 1] -= center_xy[1]
@@ -245,7 +204,7 @@ class BaseTerrain(ABC):
         normals: np.ndarray,
         faces: np.ndarray,
     ) -> None:
-        """Write OBJ with UVs and normals."""
+        """Write OBJ file with UVs and normals."""
         with open(path, "w") as f:
             f.write("# Terrain mesh - Forest3D\n")
             for v in vertices:
@@ -264,7 +223,7 @@ class BaseTerrain(ABC):
     def _write_stl(
         self, path: Path, vertices: np.ndarray, faces: np.ndarray
     ) -> None:
-        """Write STL for collision and height sampling."""
+        """Write STL file for collision and height sampling."""
         terrain = stl_mesh.Mesh(
             np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype)
         )
@@ -284,7 +243,7 @@ class BaseTerrain(ABC):
     def _create_sdf_file(
         self, textures: Optional[List[str]] = None
     ) -> Path:
-        """Create SDF with OBJ visual and STL collision."""
+        """Create SDF model file."""
         albedo_map = normal_map = roughness_map = None
 
         if textures:
@@ -406,7 +365,7 @@ class BaseTerrain(ABC):
         return path
 
     def extract_terrain_texture(self, blend_file: Path) -> List[Path]:
-        """Extract textures from Blender file for PBR materials."""
+        """Extract PBR textures from Blender file."""
         blend_file = Path(blend_file)
         if not blend_file.exists():
             raise FileNotFoundError(f"Blend file not found: {blend_file}")
@@ -415,10 +374,6 @@ class BaseTerrain(ABC):
         if not blender_path:
             raise RuntimeError("Blender not found")
 
-        # Clear textures from any previous run so _find_textures() only sees
-        # this blend's output. Otherwise stale maps from an earlier, unrelated
-        # run can be picked up nondeterministically by _create_sdf_file().
-        # Scoped to image files so anything else in the dir is left untouched.
         if self.texture_path.exists():
             for f in self.texture_path.iterdir():
                 if f.is_file() and f.suffix.lower() in (
@@ -467,7 +422,7 @@ for img in bpy.data.images:
         return [self.texture_path / t for t in textures]
 
     def process_terrain(self, **kwargs) -> Path:
-        """Full pipeline: generate mesh, SDF model, config, test world."""
+        """Run full pipeline: mesh, SDF, config, test world."""
         logger.info(f"Generating {self.TERRAIN_TYPE} terrain...")
         self.generate_terrain_mesh(**kwargs)
         textures = self._find_textures()
@@ -478,18 +433,17 @@ for img in bpy.data.images:
         return self.output_path
 
 
-# Registry of available terrain types
 _TERRAIN_REGISTRY: Dict[str, type] = {}
 
 
 def register_terrain(terrain_cls: type) -> type:
-    """Register a terrain type so it can be looked up by name."""
+    """Register a terrain type by name."""
     _TERRAIN_REGISTRY[terrain_cls.TERRAIN_TYPE] = terrain_cls
     return terrain_cls
 
 
 def get_terrain_class(terrain_type: str) -> type:
-    """Look up a terrain class by its type name."""
+    """Look up a terrain class by type name."""
     if terrain_type not in _TERRAIN_REGISTRY:
         available = list(_TERRAIN_REGISTRY)
         raise ValueError(
@@ -500,5 +454,5 @@ def get_terrain_class(terrain_type: str) -> type:
 
 
 def list_terrain_types() -> List[str]:
-    """Return all registered terrain type names."""
+    """Return registered terrain type names."""
     return list(_TERRAIN_REGISTRY)

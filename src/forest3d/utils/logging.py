@@ -13,23 +13,12 @@ def setup_logging(
     log_file: Optional[str] = None,
     console: Optional[Console] = None,
 ) -> logging.Logger:
-    """Configure logging with rich output and optional file logging.
-
-    Args:
-        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-        log_file: Optional path to log file.
-        console: Optional Rich console for output.
-
-    Returns:
-        Configured logger instance.
-    """
+    """Configure logging with rich output and optional file logging."""
     logger = logging.getLogger("forest3d")
     logger.setLevel(getattr(logging, level.upper()))
 
-    # Clear existing handlers
     logger.handlers.clear()
 
-    # Rich console handler
     console_handler = RichHandler(
         console=console or Console(stderr=True),
         show_time=True,
@@ -42,7 +31,6 @@ def setup_logging(
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
 
-    # Optional file handler
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
@@ -56,12 +44,5 @@ def setup_logging(
 
 
 def get_logger(name: str = "forest3d") -> logging.Logger:
-    """Get a logger instance.
-
-    Args:
-        name: Logger name.
-
-    Returns:
-        Logger instance.
-    """
+    """Get a logger instance."""
     return logging.getLogger(name)

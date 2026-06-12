@@ -17,7 +17,7 @@ from forest3d.core.terrain_base import get_terrain_class, list_terrain_types
 
 
 def _field_descriptions(model_cls, acc=None):
-    """Flat {field_name: description} map, recursing into nested models."""
+    """Build flat {field_name: description} map, recursing nested models."""
     acc = {} if acc is None else acc
     for name, field in model_cls.model_fields.items():
         annotation = field.annotation
@@ -32,7 +32,7 @@ _LEAF_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):\s*(\S.*)$")
 
 
 def _annotate(yaml_text, descriptions):
-    """Append each field's schema description as an inline ``# comment``."""
+    """Append schema descriptions as inline comments."""
     out = []
     for line in yaml_text.splitlines():
         match = _LEAF_LINE.match(line)
@@ -45,25 +45,17 @@ def _annotate(yaml_text, descriptions):
 
 
 def _tailored_template(terrain_type: str) -> str:
-    """Build a YAML template scoped to a single terrain type.
-
-    Keeps only the terrain sub-block and densities relevant to
-    *terrain_type*, so a crop user isn't handed forest options (and vice
-    versa). Densities are limited to fields the schema can carry, so the
-    template re-loads cleanly.
-    """
+    """Build YAML template scoped to a single terrain type."""
     cls = get_terrain_class(terrain_type)
     cfg = Forest3DConfig()
     cfg.terrain.type = terrain_type
     data = cfg.model_dump(exclude_none=True)
 
-    # Drop the terrain sub-blocks for the other terrain types.
     terrain = data["terrain"]
     for other in list_terrain_types():
         if other != terrain_type:
             terrain.pop(other, None)
 
-    # Densities: this terrain's class defaults, limited to schema fields.
     valid = set(DensityConfig.model_fields)
     data["density"] = {
         k: v for k, v in cls.default_densities().items() if k in valid

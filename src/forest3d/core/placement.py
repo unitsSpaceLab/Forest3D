@@ -9,13 +9,9 @@ import numpy as np
 from stl import mesh
 
 
-# ---------------------------------------------------------------------------
-# Shared context available to all strategies
-# ---------------------------------------------------------------------------
-
 @dataclass
 class PlacementContext:
-    """Services shared across all placement strategies."""
+    """Shared context for all placement strategies."""
 
     terrain_mesh: mesh.Mesh
     world: ET.Element
@@ -29,10 +25,6 @@ class PlacementContext:
     rng: np.random.Generator = field(
         default_factory=lambda: np.random.default_rng()
     )
-
-    # ------------------------------------------------------------------
-    # Distance checking
-    # ------------------------------------------------------------------
 
     def _get_cross_distance(self, cat1: str, cat2: str) -> float:
         key = (cat1, cat2)
@@ -57,10 +49,6 @@ class PlacementContext:
                 if dist < base_distance * scale_factor:
                     return False
         return True
-
-    # ------------------------------------------------------------------
-    # Terrain height sampling
-    # ------------------------------------------------------------------
 
     def sample_height(self, x: float, y: float) -> float:
         point = np.array([x, y])
@@ -88,10 +76,6 @@ class PlacementContext:
         except Exception:
             return float(np.mean(closest_tri[:, 2]))
 
-    # ------------------------------------------------------------------
-    # Bounds
-    # ------------------------------------------------------------------
-
     def get_bounds(
         self, margin: float = 0.0
     ) -> Tuple[float, float, float, float]:
@@ -101,10 +85,6 @@ class PlacementContext:
         min_y = float(np.min(vectors[:, 1]) + margin)
         max_y = float(np.max(vectors[:, 1]) - margin)
         return min_x, max_x, min_y, max_y
-
-    # ------------------------------------------------------------------
-    # Model helpers
-    # ------------------------------------------------------------------
 
     def random_variant(self, category: str) -> Optional[str]:
         variants = self.model_variants.get(category, [])
@@ -148,10 +128,6 @@ class PlacementContext:
         )
 
 
-# ---------------------------------------------------------------------------
-# Strategy base class
-# ---------------------------------------------------------------------------
-
 class PlacementStrategy(ABC):
     """Places models of a single category on terrain."""
 
@@ -164,30 +140,14 @@ class PlacementStrategy(ABC):
         terrain_meta: Optional[Dict] = None,
         start_index: int = 0,
     ) -> Tuple[int, int]:
-        """Place *count* models and write XML includes.
+        """Place models and write XML includes.
 
         Returns (number_placed, updated_models_placed_counter).
         """
 
 
-# ---------------------------------------------------------------------------
-# Edge-biased placement (sand, rock)
-# ---------------------------------------------------------------------------
-
 class EdgePlacement(PlacementStrategy):
-    """Edge-biased random placement.
-
-    Parameters
-    ----------
-    edge_weight : float
-        Probability of placing on an edge (vs centre).
-    jitter : float
-        Maximum random offset from the exact edge line.
-    margin : float
-        Inward margin from terrain bounds (meters).
-    height_offset_range : (float, float)
-        Uniform height perturbation range.
-    """
+    """Edge-biased random placement (sand, rock)."""
 
     def __init__(
         self,
@@ -273,38 +233,8 @@ class EdgePlacement(PlacementStrategy):
         return x, y
 
 
-# ---------------------------------------------------------------------------
-# Clustered placement (tree, bush, grass)
-# ---------------------------------------------------------------------------
-
 class ClusteredPlacement(PlacementStrategy):
-    """Place models near existing anchor models.
-
-    Parameters
-    ----------
-    anchor_categories
-        Categories to cluster around.
-    cluster_prob
-        Probability of clustering (vs random placement).
-    scale_aware
-        If True, cluster radius is derived from cross-distance and
-        anchor-scale.  If False, *radius_min_fixed* / *radius_max_fixed*
-        are used.
-    radius_scale_mult
-        max_radius = min_radius * radius_scale_mult + radius_add.
-    radius_add
-        Added to min_radius to compute max_radius.
-    radius_min_fixed
-        Absolute min radius when *scale_aware* is False.
-    radius_max_fixed
-        Absolute max radius when *scale_aware* is False.
-    avoid_categories
-        Keep distance from these categories (e.g. trees avoid sand).
-    margin
-        Inward margin for random fallback positions.
-    height_offset_range
-        Uniform height perturbation range.
-    """
+    """Place models near anchor models (tree, bush, grass)."""
 
     def __init__(
         self,
@@ -429,10 +359,6 @@ class ClusteredPlacement(PlacementStrategy):
                     return False
         return True
 
-
-# ---------------------------------------------------------------------------
-# Row placement (crop)
-# ---------------------------------------------------------------------------
 
 class RowPlacement(PlacementStrategy):
     """Regular row placement for agricultural crops."""

@@ -10,12 +10,8 @@ from forest3d.core.terrain_base import list_terrain_types, get_terrain_class
 DEFAULT_OUTPUT = "./models/ground"
 
 
-# ---------------------------------------------------------------------------
-# Build a subcommand dynamically for each registered terrain type
-# ---------------------------------------------------------------------------
-
 def _build_terrain_cmd(terrain_type: str, cls: type) -> click.Command:
-    """Create a click.Command that generates *terrain_type* terrain."""
+    """Create a click.Command for terrain_type."""
 
     def handler(ctx, output, **kwargs):
         console = ctx.obj["console"]
@@ -82,10 +78,6 @@ def _build_terrain_cmd(terrain_type: str, cls: type) -> click.Command:
     )
 
 
-# ---------------------------------------------------------------------------
-# Parent group
-# ---------------------------------------------------------------------------
-
 @click.group()
 def terrain():
     """Generate terrain mesh.
@@ -99,6 +91,5 @@ def terrain():
     """
 
 
-# Register one subcommand per terrain type
 for _t in list_terrain_types():
     terrain.add_command(_build_terrain_cmd(_t, get_terrain_class(_t)))

@@ -66,7 +66,6 @@ def convert(ctx, input_dir, output_dir, blender_path, category):
 
     input_path = Path(input_dir)
 
-    # Check for category subfolders
     category_folders = []
     for folder in input_path.iterdir():
         if folder.is_dir() and folder.name.lower() in known_categories():

@@ -44,7 +44,6 @@ def main(ctx, verbose, quiet, config_path):
     """
     ctx.ensure_object(dict)
 
-    # Setup logging based on verbosity
     if quiet:
         log_level = "ERROR"
     else:
